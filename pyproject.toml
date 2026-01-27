@@ -42,14 +42,14 @@ quote-style = 'single'
 
 [tool.pytest.ini_options]
 pythonpath = '.'
-addopts = '-p nowarnings'
+addopts = '-p no:warnings'
 
 
 [tool.taskipy.tasks]
 lint = 'ruff check'
 preformat = 'ruff check --fix'
 format = 'ruff format'
-run = 'fastapi dev meuhorarioapp.py'
+run = 'fastapi dev meuhorario/app.py'
 pre_test = 'task lint'
 test = 'pytest -s -x --cov=meuhorario -vv'
 post_test = 'coverage html'
