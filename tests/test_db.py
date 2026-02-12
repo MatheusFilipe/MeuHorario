@@ -1,4 +1,5 @@
 from dataclasses import asdict
+
 from sqlalchemy import select
 
 from meuhorario.models import User
@@ -10,10 +11,10 @@ def test_create_user(session, mock_db_time):
             first_name='julio',
             last_name='cesar',
             email='juliocesar@email.com',
-            password='vivaroma'
+            password='vivaroma',
         )
-    session.add(new_user)
-    session.commit()
+        session.add(new_user)
+        session.commit()
 
     user = session.scalar(
         select(User).where(User.email == 'juliocesar@email.com')
@@ -25,5 +26,5 @@ def test_create_user(session, mock_db_time):
         'last_name': 'cesar',
         'email': 'juliocesar@email.com',
         'password': 'vivaroma',
-        'created_at': time
+        'created_at': time,
     }
