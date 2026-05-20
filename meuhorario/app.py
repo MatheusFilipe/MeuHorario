@@ -1,16 +1,21 @@
 from http import HTTPStatus
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from meuhorario.database import get_session
 from meuhorario.models import User
-from meuhorario.schemas import UserList, UserPublic, UserSchema
+from meuhorario.schemas import Token, UserList, UserPublic, UserSchema
+from meuhorario.security import (
+    create_access_token,
+    get_password_hash,
+    verify_password,
+)
 
 app = FastAPI()
-database = list()
 
 
 @app.post('/users/', status_code=HTTPStatus.CREATED, response_model=UserPublic)
@@ -22,7 +27,14 @@ def create_user(user: UserSchema, session: Session = Depends(get_session)):
             status_code=HTTPStatus.CONFLICT, detail='E-mail já cadastrado.'
         )
 
-    db_user = User(**user.model_dump())
+    hashed_password = get_password_hash(user.password)
+
+    db_user = User(
+        first_name=user.first_name,
+        last_name=user.last_name,
+        email=user.email,
+        password=hashed_password,
+    )
 
     session.add(db_user)
     session.commit()
@@ -69,7 +81,7 @@ def update_user(
         db_user.first_name = user.first_name
         db_user.last_name = user.last_name
         db_user.email = user.email
-        db_user.password = user.password
+        db_user.password = get_password_hash(user.password)
 
         session.add(db_user)
         session.commit()
@@ -82,9 +94,7 @@ def update_user(
         )
 
 
-@app.delete(
-    '/users/{user_id}', status_code=HTTPStatus.OK, response_model=dict
-)
+@app.delete('/users/{user_id}', status_code=HTTPStatus.OK, response_model=dict)
 def delete_user(user_id: int, session: Session = Depends(get_session)):
     user = session.scalar(select(User).where(User.id == user_id))
     if not user:
@@ -96,3 +106,25 @@ def delete_user(user_id: int, session: Session = Depends(get_session)):
     session.commit()
 
     return {'message': 'Usuário deletado.'}
+
+
+@app.post('/token', status_code=HTTPStatus.OK, response_model=Token)
+def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: Session = Depends(get_session),
+):
+    user = session.scalar(select(User).where(User.email == form_data.username))
+
+    if not user:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Usuário não encontrado.'
+        )
+    if not verify_password(form_data.password, user.password):
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED,
+            detail='E-mail ou senha incorreta.',
+        )
+
+    access_token = create_access_token(data={'sub': user.email})
+
+    return {'access_token': access_token, 'token_type': 'bearer'}
