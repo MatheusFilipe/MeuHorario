@@ -11,6 +11,7 @@ from meuhorario.models import User
 from meuhorario.schemas import Token, UserList, UserPublic, UserSchema
 from meuhorario.security import (
     create_access_token,
+    get_current_user,
     get_password_hash,
     verify_password,
 )
@@ -66,28 +67,32 @@ def get_users(
 
 
 @app.put(
-    '/users/{user_id}', status_code=HTTPStatus.OK, response_model=UserPublic
+    '/users/{user_id}',
+    status_code=HTTPStatus.OK,
+    response_model=UserPublic,
 )
 def update_user(
-    user_id: int, user: UserSchema, session: Session = Depends(get_session)
+    user_id: int,
+    user: UserSchema,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
-    db_user = session.scalar(select(User).where(User.id == user_id))
-    if not db_user:
+    if current_user.id != user_id:
         raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='Usuário não encontrado.'
+            status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
         )
 
     try:
-        db_user.first_name = user.first_name
-        db_user.last_name = user.last_name
-        db_user.email = user.email
-        db_user.password = get_password_hash(user.password)
+        current_user.first_name = user.first_name
+        current_user.last_name = user.last_name
+        current_user.email = user.email
+        current_user.password = get_password_hash(user.password)
 
-        session.add(db_user)
+        session.add(current_user)
         session.commit()
-        session.refresh(db_user)
+        session.refresh(current_user)
 
-        return db_user
+        return current_user
     except IntegrityError:
         raise HTTPException(
             status_code=HTTPStatus.CONFLICT, detail='E-mail já cadastrado.'
@@ -95,14 +100,17 @@ def update_user(
 
 
 @app.delete('/users/{user_id}', status_code=HTTPStatus.OK, response_model=dict)
-def delete_user(user_id: int, session: Session = Depends(get_session)):
-    user = session.scalar(select(User).where(User.id == user_id))
-    if not user:
+def delete_user(
+    user_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.id != user_id:
         raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='Usuário não encontrado.'
+            status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
         )
 
-    session.delete(user)
+    session.delete(current_user)
     session.commit()
 
     return {'message': 'Usuário deletado.'}
