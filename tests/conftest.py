@@ -11,6 +11,7 @@ from meuhorario.app import app
 from meuhorario.database import get_session
 from meuhorario.models import User, table_registry
 from meuhorario.security import get_password_hash
+from meuhorario.settings import Settings
 
 
 @pytest.fixture
@@ -78,8 +79,13 @@ def user(session):
 @pytest.fixture
 def token(client, user):
     response = client.post(
-        '/token',
+        '/auth/token',
         data={'username': user.email, 'password': user.clean_password},
     )
 
     return response.json()['access_token']
+
+
+@pytest.fixture
+def settings():
+    return Settings()
