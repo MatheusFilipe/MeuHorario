@@ -1,5 +1,7 @@
 from http import HTTPStatus
 
+from freezegun import freeze_time
+
 from meuhorario.security import create_access_token
 
 
@@ -15,20 +17,20 @@ def test_get_token(client, user):
     assert 'token_type' in token
 
 
-def test_invalid_email(client):
+def test_token_inexistent_user(client):
     response = client.post(
         '/auth/token',
-        data={'username': 'invalid@email.com', 'password': 'secret'}
+        data={'username': 'invalid@email.com', 'password': 'secret'},
     )
 
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json() == {'detail': 'Usuário não encontrado.'}
 
 
-def test_invalid_password(client, user):
+def test_token_wrong_password(client, user):
     response = client.post(
         '/auth/token',
-        data={'username': user.email, 'password': 'invalid_password'}
+        data={'username': user.email, 'password': 'invalid_password'},
     )
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
@@ -61,3 +63,67 @@ def test_current_user_does_not_exists(client):
     assert response.json() == {
         'detail': 'Não foi possível validar suas credenciais.'
     }
+
+
+def test_token_expired_after_time(client, user):
+    with freeze_time('2001-09-11 08:46:00'):
+        response = client.post(
+            '/auth/token',
+            data={'username': user.email, 'password': user.clean_password},
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        token = response.json()['access_token']
+
+    with freeze_time('2001-09-11 09:16:01'):
+        response = client.put(
+            f'/users/{user.id}',
+            headers={'Authorization': f'Bearer {token}'},
+            json={
+                'first_name': 'test',
+                'last_name': 'test',
+                'email': 'test@email.com',
+                'password': 'secret',
+            },
+        )
+
+        assert response.status_code == HTTPStatus.UNAUTHORIZED
+        assert response.json() == {
+            'detail': 'Não foi possível validar suas credenciais.'
+        }
+
+
+def test_refresh_token(client, token):
+    response = client.post(
+        '/auth/refresh_token',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    data = response.json()
+
+    assert response.status_code == HTTPStatus.OK
+    assert 'access_token' in data
+    assert 'token_type' in data
+    assert data['token_type'] == 'Bearer'
+
+
+def token_expired_dont_refresh(client, user):
+    with freeze_time('2001-09-11 08:46:00'):
+        response = client.post(
+            '/auth/token',
+            data={'username': user.email, 'password': user.clean_password},
+        )
+
+        assert response.status_code == HTTPStatus.OK
+        token = response.json()['access_token']
+
+    with freeze_time('2001-09-11 09:16:01'):
+        response = client.post(
+            '/auth/refresh_token',
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
+        assert response.status_code == HTTPStatus.UNAUTHORIZED
+        assert response.json() == {
+            'detail': 'Não foi possível validar suas credenciais.'
+        }

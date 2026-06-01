@@ -23,15 +23,15 @@ def test_create_user(client):
     }
 
 
-def test_user_already_exists(client, user):
+def test_post_user_already_exists(client, user):
     response = client.post(
         '/users/',
         json={
             'first_name': 'first_name',
             'last_name': 'last_name',
             'email': user.email,
-            'password': 'secret'
-        }
+            'password': 'secret',
+        },
     )
 
     assert response.status_code == HTTPStatus.CONFLICT
@@ -55,7 +55,7 @@ def test_get_users_empty(client):
 
 
 def test_get_user(client, user):
-    response = client.get('/users/1')
+    response = client.get(f'/users/{user.id}')
 
     user_schema = UserPublic.model_validate(user).model_dump()
 
@@ -91,23 +91,14 @@ def test_update_user(client, user, token):
     }
 
 
-def test_update_integrity_error(client, user, token):
-    client.post(
-        '/users/',
-        json={
-            'first_name': 'michael',
-            'last_name': 'jackson',
-            'email': 'rusbe@email.com',
-            'password': 'hehe',
-        },
-    )
+def test_update_integrity_error(client, other_user, user, token):
     response = client.put(
         f'/users/{user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
             'first_name': 'cristiano',
             'last_name': 'ronaldo',
-            'email': 'rusbe@email.com',
+            'email': other_user.email,
             'password': 'siiiuuuu',
         },
     )
@@ -116,16 +107,16 @@ def test_update_integrity_error(client, user, token):
     assert response.json() == {'detail': 'E-mail já cadastrado.'}
 
 
-def test_update_another_user(client, token):
+def test_update_user_with_wrong_user(client, other_user, token):
     response = client.put(
-        '/users/67',
+        f'/users/{other_user.id}',
         headers={'Authorization': f'Bearer {token}'},
         json={
             'first_name': 'first_name',
             'last_name': 'last_name',
             'email': 'email@example.com',
             'password': 'secret',
-        }
+        },
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN
@@ -141,10 +132,9 @@ def test_delete_user(client, user, token):
     assert response.json() == {'message': 'Usuário deletado.'}
 
 
-def test_delete_another_user(client, token):
+def test_delete_user_wrong_user(client, other_user, token):
     response = client.delete(
-        '/users/67',
-        headers={'Authorization': f'Bearer {token}'}
+        f'/users/{other_user.id}', headers={'Authorization': f'Bearer {token}'}
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN

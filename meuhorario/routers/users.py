@@ -46,9 +46,7 @@ async def create_user(user: UserSchema, session: Session):
 
 @router.get('/{user_id}', status_code=HTTPStatus.OK, response_model=UserPublic)
 async def get_user(user_id: int, session: Session):
-    user = await session.scalar(
-        select(User).where(User.id == user_id)
-    )
+    user = await session.scalar(select(User).where(User.id == user_id))
 
     if not user:
         raise HTTPException(
@@ -59,9 +57,7 @@ async def get_user(user_id: int, session: Session):
 
 
 @router.get('/', status_code=HTTPStatus.OK, response_model=UserList)
-async def get_users(
-    session: Session, filter_users: FilterPage
-):
+async def get_users(session: Session, filter_users: FilterPage):
     users = await session.scalars(
         select(User).limit(filter_users.limit).offset(filter_users.offset)
     )
