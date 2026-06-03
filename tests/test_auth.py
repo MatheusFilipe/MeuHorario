@@ -95,8 +95,7 @@ def test_token_expired_after_time(client, user):
 
 def test_refresh_token(client, token):
     response = client.post(
-        '/auth/refresh_token',
-        headers={'Authorization': f'Bearer {token}'}
+        '/auth/refresh_token', headers={'Authorization': f'Bearer {token}'}
     )
 
     data = response.json()

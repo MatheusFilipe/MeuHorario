@@ -42,9 +42,7 @@ async def login_for_access_token(session: Session, form_data: OAuth2Form):
     return {'access_token': access_token, 'token_type': 'Bearer'}
 
 
-@router.post(
-    '/refresh_token', status_code=HTTPStatus.OK, response_model=Token
-)
+@router.post('/refresh_token', status_code=HTTPStatus.OK, response_model=Token)
 async def refresh_token(user: CurrentUser):
     new_access_token = create_access_token(data={'sub': user.email})
 

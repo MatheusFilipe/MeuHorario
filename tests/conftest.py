@@ -11,9 +11,20 @@ from sqlalchemy.pool import StaticPool
 
 from meuhorario.app import app
 from meuhorario.database import get_session
-from meuhorario.models import User, table_registry
+from meuhorario.models import User, UserRole, table_registry
 from meuhorario.security import get_password_hash
 from meuhorario.settings import Settings
+
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    first_name = factory.Sequence(lambda n: f'teste{n}')
+    last_name = factory.Sequence(lambda n: f'sobrenome{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.first_name}@email.com')
+    password = factory.LazyAttribute(lambda obj: f'{obj.first_name}.secret')
+    role = UserRole.client
 
 
 @pytest.fixture
@@ -87,6 +98,21 @@ async def other_user(session):
     return user
 
 
+@pytest_asyncio.fixture
+async def admin(session):
+    password = 'secret'
+    user = UserFactory(
+        password=get_password_hash(password), role=UserRole.admin
+    )
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    user.clean_password = password
+
+    return user
+
+
 @pytest.fixture
 def token(client, user):
     response = client.post(
@@ -98,15 +124,15 @@ def token(client, user):
 
 
 @pytest.fixture
+def token_admin(client, admin):
+    response = client.post(
+        '/auth/token',
+        data={'username': admin.email, 'password': admin.clean_password}
+    )
+
+    return response.json()['access_token']
+
+
+@pytest.fixture
 def settings():
     return Settings()
-
-
-class UserFactory(factory.Factory):
-    class Meta:
-        model = User
-
-    first_name = factory.Sequence(lambda n: f'teste{n}')
-    last_name = factory.Sequence(lambda n: f'sobrenome{n}')
-    email = factory.LazyAttribute(lambda obj: f'{obj.first_name}@email.com')
-    password = factory.LazyAttribute(lambda obj: f'{obj.first_name}.secret')

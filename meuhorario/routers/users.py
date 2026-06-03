@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from meuhorario.database import get_session
-from meuhorario.models import User
+from meuhorario.models import User, UserRole
 from meuhorario.schemas import FilterPage, UserList, UserPublic, UserSchema
 from meuhorario.security import get_current_user, get_password_hash
 
@@ -35,6 +35,7 @@ async def create_user(user: UserSchema, session: Session):
         last_name=user.last_name,
         email=user.email,
         password=hashed_password,
+        role=UserRole.client
     )
 
     session.add(db_user)
@@ -109,7 +110,34 @@ async def delete_user(
             status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
         )
 
-    session.delete(current_user)
+    await session.delete(current_user)
     await session.commit()
 
     return {'message': 'Usuário deletado.'}
+
+
+@router.post(
+    '/professional', status_code=HTTPStatus.OK, response_model=UserPublic
+)
+async def create_user_professional(
+    user: CurrentUser, session: Session, new_user: UserSchema
+):
+    if user.role != UserRole.admin:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='Apenas administradores podem criar profissionais.',
+        )
+
+    professional = User(
+        first_name=new_user.first_name,
+        last_name=new_user.last_name,
+        email=new_user.email,
+        password=get_password_hash(new_user.password),
+        role=UserRole.professional,
+    )
+
+    session.add(professional)
+    await session.commit()
+    await session.refresh(professional)
+
+    return professional

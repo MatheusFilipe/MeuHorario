@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+from meuhorario.models import UserRole
 from meuhorario.schemas import UserPublic
 
 
@@ -10,7 +11,7 @@ def test_create_user(client):
             'first_name': 'michael',
             'last_name': 'jackson',
             'email': 'michaeljackson@email.com',
-            'password': 'rusbe',
+            'password': 'rusbe'
         },
     )
 
@@ -20,6 +21,7 @@ def test_create_user(client):
         'first_name': 'michael',
         'last_name': 'jackson',
         'email': 'michaeljackson@email.com',
+        'role': UserRole.client
     }
 
 
@@ -88,6 +90,7 @@ def test_update_user(client, user, token):
         'first_name': 'cristiano',
         'last_name': 'ronaldo',
         'email': 'cr7@email.com',
+        'role': user.role
     }
 
 
@@ -139,3 +142,43 @@ def test_delete_user_wrong_user(client, other_user, token):
 
     assert response.status_code == HTTPStatus.FORBIDDEN
     assert response.json() == {'detail': 'Você não tem permissão.'}
+
+
+def test_create_user_professional(client, token_admin):
+    response = client.post(
+        '/users/professional',
+        headers={'Authorization': f'Bearer {token_admin}'},
+        json={
+            'first_name': 'test',
+            'last_name': 'test',
+            'email': 'professional@example.com',
+            'password': 'secret'
+        }
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        'id': 2,
+        'first_name': 'test',
+        'last_name': 'test',
+        'email': 'professional@example.com',
+        'role': UserRole.professional
+    }
+
+
+def test_create_user_professional_forbidden(client, token):
+    response = client.post(
+        '/users/professional',
+        headers={'Authorization': f'Bearer {token}'},
+        json={
+            'first_name': 'test',
+            'last_name': 'test',
+            'email': 'professional@example.com',
+            'password': 'secret'
+        }
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {
+        'detail': 'Apenas administradores podem criar profissionais.'
+    }

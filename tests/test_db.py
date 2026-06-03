@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from meuhorario.models import User
+from meuhorario.models import User, UserRole
 
 
 @pytest.mark.asyncio
@@ -15,6 +15,7 @@ async def test_create_user(session: AsyncSession, mock_db_time):
             last_name='cesar',
             email='juliocesar@email.com',
             password='vivaroma',
+            role=UserRole.client
         )
         session.add(new_user)
         await session.commit()
@@ -30,4 +31,5 @@ async def test_create_user(session: AsyncSession, mock_db_time):
         'email': 'juliocesar@email.com',
         'password': 'vivaroma',
         'created_at': time,
+        'role': UserRole.client
     }
