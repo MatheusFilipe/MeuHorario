@@ -15,7 +15,7 @@ async def test_create_user(session: AsyncSession, mock_db_time):
             last_name='cesar',
             email='juliocesar@email.com',
             password='vivaroma',
-            role=UserRole.client
+            role=UserRole.client,
         )
         session.add(new_user)
         await session.commit()
@@ -31,5 +31,5 @@ async def test_create_user(session: AsyncSession, mock_db_time):
         'email': 'juliocesar@email.com',
         'password': 'vivaroma',
         'created_at': time,
-        'role': UserRole.client
+        'role': UserRole.client,
     }

@@ -29,12 +29,21 @@ class User:
 
 
 @table_registry.mapped_as_dataclass
+class Service:
+    __tablename__ = 'services'
+
+    id: Mapped[int] = mapped_column(init=False, primary_key=True)
+    name: Mapped[str]
+    duration: Mapped[int]
+    price: Mapped[float]
+
+
+@table_registry.mapped_as_dataclass
 class Schedule:
     __tablename__ = 'schedules'
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    description: Mapped[str]
     client_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     professional_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    service_id: Mapped[int] = mapped_column(ForeignKey('services.id'))
     datetime: Mapped[datetime]
-    duration: Mapped[int]  # minutes

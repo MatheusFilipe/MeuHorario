@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from meuhorario.app import app
 from meuhorario.database import get_session
-from meuhorario.models import User, UserRole, table_registry
+from meuhorario.models import Service, User, UserRole, table_registry
 from meuhorario.security import get_password_hash
 from meuhorario.settings import Settings
 
@@ -113,6 +113,32 @@ async def admin(session):
     return user
 
 
+@pytest_asyncio.fixture
+async def professional(session):
+    password = 'secret'
+    user = UserFactory(
+        password=get_password_hash(password), role=UserRole.professional
+    )
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    user.clean_password = password
+
+    return user
+
+
+@pytest_asyncio.fixture
+async def service(session):
+    service = Service(name='test', duration=10, price=67.67)
+
+    session.add(service)
+    await session.commit()
+    await session.refresh(service)
+
+    return service
+
+
 @pytest.fixture
 def token(client, user):
     response = client.post(
@@ -127,7 +153,20 @@ def token(client, user):
 def token_admin(client, admin):
     response = client.post(
         '/auth/token',
-        data={'username': admin.email, 'password': admin.clean_password}
+        data={'username': admin.email, 'password': admin.clean_password},
+    )
+
+    return response.json()['access_token']
+
+
+@pytest.fixture
+def token_professional(client, professional):
+    response = client.post(
+        '/auth/token',
+        data={
+            'username': professional.email,
+            'password': professional.clean_password,
+        },
     )
 
     return response.json()['access_token']

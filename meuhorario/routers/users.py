@@ -35,7 +35,7 @@ async def create_user(user: UserSchema, session: Session):
         last_name=user.last_name,
         email=user.email,
         password=hashed_password,
-        role=UserRole.client
+        role=UserRole.client,
     )
 
     session.add(db_user)

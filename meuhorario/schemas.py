@@ -36,12 +36,33 @@ class FilterPage(BaseModel):
     limit: int = Field(ge=1, default=10)
 
 
+class ServiceSchema(BaseModel):
+    name: str
+    duration: int
+    price: float
+
+
+class ServicePublic(ServiceSchema):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ServiceList(BaseModel):
+    services: list[ServicePublic]
+
+
+class ServiceUpdate(BaseModel):
+    name: str | None = None
+    duration: int | None = None
+    price: float | None = None
+
+
 class ScheduleSchema(BaseModel):
-    description: str
     client_id: int
     professional_id: int
+    service_id: int
     datetime: datetime
-    duration: int
 
 
 class SchedulePublic(ScheduleSchema):

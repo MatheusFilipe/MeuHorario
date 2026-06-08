@@ -11,7 +11,7 @@ def test_create_user(client):
             'first_name': 'michael',
             'last_name': 'jackson',
             'email': 'michaeljackson@email.com',
-            'password': 'rusbe'
+            'password': 'rusbe',
         },
     )
 
@@ -21,7 +21,7 @@ def test_create_user(client):
         'first_name': 'michael',
         'last_name': 'jackson',
         'email': 'michaeljackson@email.com',
-        'role': UserRole.client
+        'role': UserRole.client,
     }
 
 
@@ -90,7 +90,7 @@ def test_update_user(client, user, token):
         'first_name': 'cristiano',
         'last_name': 'ronaldo',
         'email': 'cr7@email.com',
-        'role': user.role
+        'role': user.role,
     }
 
 
@@ -152,8 +152,8 @@ def test_create_user_professional(client, token_admin):
             'first_name': 'test',
             'last_name': 'test',
             'email': 'professional@example.com',
-            'password': 'secret'
-        }
+            'password': 'secret',
+        },
     )
 
     assert response.status_code == HTTPStatus.OK
@@ -162,7 +162,7 @@ def test_create_user_professional(client, token_admin):
         'first_name': 'test',
         'last_name': 'test',
         'email': 'professional@example.com',
-        'role': UserRole.professional
+        'role': UserRole.professional,
     }
 
 
@@ -174,8 +174,8 @@ def test_create_user_professional_forbidden(client, token):
             'first_name': 'test',
             'last_name': 'test',
             'email': 'professional@example.com',
-            'password': 'secret'
-        }
+            'password': 'secret',
+        },
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN
