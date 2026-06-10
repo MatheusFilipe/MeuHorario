@@ -39,8 +39,8 @@ class Service:
 
 
 @table_registry.mapped_as_dataclass
-class Schedule:
-    __tablename__ = 'schedules'
+class Appointment:
+    __tablename__ = 'appointments'
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
     client_id: Mapped[int] = mapped_column(ForeignKey('users.id'))

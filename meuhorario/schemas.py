@@ -58,12 +58,12 @@ class ServiceUpdate(BaseModel):
     price: float | None = None
 
 
-class ScheduleSchema(BaseModel):
+class AppointmentSchema(BaseModel):
     client_id: int
     professional_id: int
     service_id: int
     datetime: datetime
 
 
-class SchedulePublic(ScheduleSchema):
+class AppointmentPublic(AppointmentSchema):
     id: int
