@@ -32,4 +32,6 @@ async def test_create_user(session: AsyncSession, mock_db_time):
         'password': 'vivaroma',
         'created_at': time,
         'role': UserRole.client,
+        'client_appointments': [],
+        'professional_appointments': []
     }
