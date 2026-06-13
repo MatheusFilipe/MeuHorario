@@ -59,11 +59,11 @@ class ServiceUpdate(BaseModel):
 
 
 class AppointmentSchema(BaseModel):
+    client_id: int
     professional_id: int
     service_id: int
     datetime: datetime
 
 
 class AppointmentPublic(AppointmentSchema):
-    client_id: int
     id: int

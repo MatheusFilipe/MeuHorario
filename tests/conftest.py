@@ -11,7 +11,13 @@ from sqlalchemy.pool import StaticPool
 
 from meuhorario.app import app
 from meuhorario.database import get_session
-from meuhorario.models import Service, User, UserRole, table_registry
+from meuhorario.models import (
+    Appointment,
+    Service,
+    User,
+    UserRole,
+    table_registry,
+)
 from meuhorario.security import get_password_hash
 from meuhorario.settings import Settings
 
@@ -137,6 +143,22 @@ async def service(session):
     await session.refresh(service)
 
     return service
+
+
+@pytest_asyncio.fixture
+async def appointment(user, professional, service, session):
+    appointment = Appointment(
+        client_id=user.id,
+        professional_id=professional.id,
+        service_id=service.id,
+        datetime='2001-09-11 08:46:00',
+    )
+
+    session.add(appointment)
+    await session.commit()
+    await session.refresh()
+
+    return appointment
 
 
 @pytest.fixture
