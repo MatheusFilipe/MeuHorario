@@ -24,17 +24,19 @@ class Appointment:
     datetime: Mapped[datetime]
 
     client: Mapped['User'] = relationship(
+        init=False,
         foreign_keys=[client_id],
         back_populates='client_appointments',
-        lazy='joined'
+        lazy='joined',
     )
     professional: Mapped['User'] = relationship(
+        init=False,
         foreign_keys=[professional_id],
         back_populates='professional_appointments',
-        lazy='joined'
+        lazy='joined',
     )
     service: Mapped['Service'] = relationship(
-        back_populates='appointments', lazy='joined'
+        init=False, back_populates='appointments', lazy='joined'
     )
 
 
@@ -56,13 +58,13 @@ class User:
         init=False,
         foreign_keys=[Appointment.client_id],
         back_populates='client',
-        lazy='selectin'
+        lazy='selectin',
     )
     professional_appointments: Mapped[list['Appointment']] = relationship(
         init=False,
         foreign_keys=[Appointment.professional_id],
         back_populates='professional',
-        lazy='selectin'
+        lazy='selectin',
     )
 
 
