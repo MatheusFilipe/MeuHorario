@@ -227,3 +227,43 @@ def test_admin_create_appointment(
         'start_time': '2001-09-11T08:46:00',
         'end_time': '2001-09-11T08:56:00',
     }
+
+
+def test_verify_availability_client(  # noqa: PLR0913 PLR0917
+    client, appointment, user, professional, service, token
+):
+    response = client.post(
+        '/appointments/',
+        json={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+            'start_time': '2001-09-11 08:50:00',
+        },
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.CONFLICT
+    assert response.json() == {
+        'detail': 'O cliente não tem disponibilidade nesse horário.'
+    }
+
+
+def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
+    client, appointment, other_user, professional, service, token_admin
+):
+    response = client.post(
+        '/appointments/',
+        json={
+            'client_id': other_user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+            'start_time': '2001-09-11 08:50:00',
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.CONFLICT
+    assert response.json() == {
+        'detail': 'O profissional não tem disponibilidade nesse horário.'
+    }

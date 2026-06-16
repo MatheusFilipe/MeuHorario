@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import factory
 import pytest
@@ -147,16 +147,19 @@ async def service(session):
 
 @pytest_asyncio.fixture
 async def appointment(user, professional, service, session):
+    start_time = datetime(2001, 9, 11, 8, 46, 0)
+    end_time = start_time + timedelta(minutes=service.duration)
     appointment = Appointment(
         client_id=user.id,
         professional_id=professional.id,
         service_id=service.id,
-        datetime='2001-09-11 08:46:00',
+        start_time=start_time,
+        end_time=end_time,
     )
 
     session.add(appointment)
     await session.commit()
-    await session.refresh()
+    await session.refresh(appointment)
 
     return appointment
 

@@ -52,8 +52,44 @@ def unprocessable_entity(client=False, professional=False):
         )
 
 
-# async def verify_disponibility(session, client, professional, start_time, end_time):
-#     ...
+async def verify_availability(
+    session, client, professional, start_time, end_time
+):
+    client_appointments = await session.scalars(
+        select(Appointment).where(Appointment.client_id == client.id)
+    )
+    for appointment in client_appointments:
+        overlap = max(
+            timedelta(0),
+            (
+                min(appointment.end_time, end_time)
+                - max(appointment.start_time, start_time)
+            ),
+        )
+        if overlap > timedelta(0):
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail='O cliente não tem disponibilidade nesse horário.',
+            )
+
+    professional_appointments = await session.scalars(
+        select(Appointment).where(
+            Appointment.professional_id == professional.id
+        )
+    )
+    for appointment in professional_appointments:
+        overlap = max(
+            timedelta(0),
+            (
+                min(appointment.end_time, end_time)
+                - max(appointment.start_time, start_time)
+            ),
+        )
+        if overlap > timedelta(0):
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail='O profissional não tem disponibilidade nesse horário.',
+            )
 
 
 @router.post('/', status_code=HTTPStatus.OK, response_model=AppointmentPublic)
@@ -110,7 +146,9 @@ async def create_appointment(
         minutes=service.duration
     )
 
-    # verify_disponibility(session, client, professional, start_time, end_time)
+    await verify_availability(
+        session, client, professional, start_time, end_time
+    )
 
     appointment = Appointment(
         client_id=client.id,
@@ -133,7 +171,7 @@ async def get_appointments(
 ):
     if user.role == UserRole.client:
         query = select(Appointment).where(Appointment.client == user)
-  
+
     elif user.role == UserRole.professional:
         query = select(Appointment).where(Appointment.professional == user)
     elif user.role == UserRole.admin:
