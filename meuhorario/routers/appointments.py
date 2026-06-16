@@ -1,3 +1,4 @@
+from datetime import timedelta
 from http import HTTPStatus
 from typing import Annotated
 
@@ -6,8 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from meuhorario.database import get_session
-from meuhorario.models import Appointment, User, UserRole
-from meuhorario.schemas import AppointmentPublic, AppointmentSchema
+from meuhorario.models import Appointment, Service, User, UserRole
+from meuhorario.schemas import (
+    AppointmentList,
+    AppointmentPublic,
+    AppointmentSchema,
+    FilterAppointments,
+)
 from meuhorario.security import get_current_user
 
 router = APIRouter(prefix='/appointments', tags=['appointments'])
@@ -46,6 +52,10 @@ def unprocessable_entity(client=False, professional=False):
         )
 
 
+# async def verify_disponibility(session, client, professional, start_time, end_time):
+#     ...
+
+
 @router.post('/', status_code=HTTPStatus.OK, response_model=AppointmentPublic)
 async def create_appointment(
     user: CurrentUser,
@@ -61,8 +71,7 @@ async def create_appointment(
         if professional.role != UserRole.professional:
             raise unprocessable_entity(professional=True)
 
-        client_id = user.id
-        professional_id = professional.id
+        client = user
 
     elif user.role == UserRole.professional:
         client = await session.scalar(
@@ -74,8 +83,7 @@ async def create_appointment(
         if client.role != UserRole.client:
             raise unprocessable_entity(client=True)
 
-        client_id = client.id
-        professional_id = user.id
+        professional = user
 
     elif user.role == UserRole.admin:
         client = await session.scalar(
@@ -94,14 +102,22 @@ async def create_appointment(
         if professional.role != UserRole.professional:
             raise unprocessable_entity(professional=True)
 
-        client_id = client.id
-        professional_id = professional.id
+    service = await session.scalar(
+        select(Service).where(Service.id == appointment_schema.service_id)
+    )
+    start_time = appointment_schema.start_time
+    end_time = appointment_schema.start_time + timedelta(
+        minutes=service.duration
+    )
+
+    # verify_disponibility(session, client, professional, start_time, end_time)
 
     appointment = Appointment(
-        client_id=client_id,
-        professional_id=professional_id,
-        service_id=appointment_schema.service_id,
-        datetime=appointment_schema.datetime,
+        client_id=client.id,
+        professional_id=professional.id,
+        service_id=service.id,
+        start_time=start_time,
+        end_time=end_time,
     )
 
     session.add(appointment)
@@ -109,3 +125,33 @@ async def create_appointment(
     await session.refresh(appointment)
 
     return appointment
+
+
+@router.get('/', status_code=HTTPStatus.OK, response_model=AppointmentList)
+async def get_appointments(
+    session: Session, user: CurrentUser, filter: FilterAppointments
+):
+    if user.role == UserRole.client:
+        query = select(Appointment).where(Appointment.client == user)
+  
+    elif user.role == UserRole.professional:
+        query = select(Appointment).where(Appointment.professional == user)
+    elif user.role == UserRole.admin:
+        query = select(Appointment)
+
+    if filter.client_id:
+        query = query.filter(Appointment.client_id.contains(filter.client_id))
+    if filter.professional_id:
+        query = query.filter(
+            Appointment.profesisonal_id.contains(filter.professional_id)
+        )
+    if filter.service_id:
+        query = query.filter(
+            Appointment.service_id.contains(filter.service_id)
+        )
+
+    appointments = await session.scalars(
+        query.offset(filter.offset).limit(filter.limit)
+    )
+
+    return {'appointments': appointments}

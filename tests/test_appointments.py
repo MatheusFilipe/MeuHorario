@@ -12,7 +12,7 @@ def test_client_create_appointment_invalid_professional_id(
             'client_id': user.id,
             'professional_id': 67,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -30,7 +30,7 @@ def test_client_create_appointment_unprocessable_entity(
             'client_id': user.id,
             'professional_id': other_user.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -48,7 +48,7 @@ def test_client_create_appointment(client, token, user, professional, service):
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -59,7 +59,8 @@ def test_client_create_appointment(client, token, user, professional, service):
         'client_id': user.id,
         'professional_id': professional.id,
         'service_id': service.id,
-        'datetime': '2001-09-11T08:46:00',
+        'start_time': '2001-09-11T08:46:00',
+        'end_time': '2001-09-11T08:56:00',
     }
 
 
@@ -72,7 +73,7 @@ def test_professional_create_appointment_invalid_client_id(
             'client_id': 67,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -92,7 +93,7 @@ def test_professional_create_appointment_unprocessable_entity(
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -110,7 +111,7 @@ def test_professional_create_appointment(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -121,7 +122,8 @@ def test_professional_create_appointment(
         'client_id': user.id,
         'professional_id': professional.id,
         'service_id': service.id,
-        'datetime': '2001-09-11T08:46:00',
+        'start_time': '2001-09-11T08:46:00',
+        'end_time': '2001-09-11T08:56:00',
     }
 
 
@@ -134,7 +136,7 @@ def test_admin_create_appointment_invalid_client_id(
             'client_id': 67,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -152,7 +154,7 @@ def test_admin_create_appointment_invalid_professional_id(
             'client_id': user.id,
             'professional_id': 67,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -172,7 +174,7 @@ def test_admin_create_appointment_unprocessable_entity_client(
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -191,7 +193,7 @@ def test_admin_create_appointment_unprocessable_entity_professional(
             'client_id': user.id,
             'professional_id': other_user.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -211,7 +213,7 @@ def test_admin_create_appointment(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'datetime': '2001-09-11 08:46:00',
+            'start_time': '2001-09-11 08:46:00',
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -222,5 +224,6 @@ def test_admin_create_appointment(
         'client_id': user.id,
         'professional_id': professional.id,
         'service_id': service.id,
-        'datetime': '2001-09-11T08:46:00',
+        'start_time': '2001-09-11T08:46:00',
+        'end_time': '2001-09-11T08:56:00',
     }

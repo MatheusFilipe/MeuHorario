@@ -13,6 +13,9 @@ class UserRole(str, Enum):
     admin = 'admin'
 
 
+class AppointmentState(str, Enum): ...
+
+
 @table_registry.mapped_as_dataclass
 class Appointment:
     __tablename__ = 'appointments'
@@ -21,7 +24,8 @@ class Appointment:
     client_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     professional_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     service_id: Mapped[int] = mapped_column(ForeignKey('services.id'))
-    datetime: Mapped[datetime]
+    start_time: Mapped[datetime]
+    end_time: Mapped[datetime]
 
     client: Mapped['User'] = relationship(
         init=False,

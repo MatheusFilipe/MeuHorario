@@ -36,6 +36,12 @@ class FilterPage(BaseModel):
     limit: int = Field(ge=1, default=10)
 
 
+class FilterAppointments(FilterPage):
+    client_id: int | None = None
+    professional_id: int | None = None
+    service_id: int | None = None
+
+
 class ServiceSchema(BaseModel):
     name: str
     duration: int
@@ -62,8 +68,13 @@ class AppointmentSchema(BaseModel):
     client_id: int
     professional_id: int
     service_id: int
-    datetime: datetime
+    start_time: datetime
 
 
 class AppointmentPublic(AppointmentSchema):
+    end_time: datetime
     id: int
+
+
+class AppointmentList(BaseModel):
+    appointments: list[AppointmentPublic]
