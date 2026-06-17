@@ -267,3 +267,107 @@ def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
     assert response.json() == {
         'detail': 'O profissional não tem disponibilidade nesse horário.'
     }
+
+
+def test_get_appointments_empty(client, token_admin):
+    response = client.get(
+        '/appointments/',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'appointments': []}
+
+
+def test_get_appointments_as_admin(client, appointment, token_admin):
+    response = client.get(
+        '/appointments/',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+    assert (
+        response.json()['appointments'][0]['client_id']
+        == appointment.client_id
+    )
+    assert (
+        response.json()['appointments'][0]['professional_id']
+        == appointment.professional_id
+    )
+
+
+def test_get_appointments_as_client(client, appointment, token):
+    response = client.get(
+        '/appointments/',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+    assert (
+        response.json()['appointments'][0]['client_id']
+        == appointment.client_id
+    )
+
+
+def test_get_appointments_as_professional(
+    client, appointment, token_professional
+):
+    response = client.get(
+        '/appointments/',
+        headers={'Authorization': f'Bearer {token_professional}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+    assert (
+        response.json()['appointments'][0]['professional_id']
+        == appointment.professional_id
+    )
+
+
+def test_get_appointments_filter_by_client_id(
+    client, appointment, token_admin
+):
+    response = client.get(
+        f'/appointments/?client_id={appointment.client_id}',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+
+
+def test_get_appointments_filter_by_professional_id(
+    client, appointment, token_admin
+):
+    response = client.get(
+        f'/appointments/?professional_id={appointment.professional_id}',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+
+
+def test_get_appointments_filter_by_service_id(
+    client, appointment, token_admin
+):
+    response = client.get(
+        f'/appointments/?service_id={appointment.service_id}',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['appointments']) == 1
+
+
+def test_get_appointments_pagination(client, appointment, token_admin):
+    response = client.get(
+        '/appointments/?offset=1&limit=1',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'appointments': []}

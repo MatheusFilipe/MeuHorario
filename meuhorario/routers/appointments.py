@@ -2,7 +2,7 @@ from datetime import timedelta
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix='/appointments', tags=['appointments'])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 Session = Annotated[AsyncSession, Depends(get_session)]
+AppointmentFilter = Annotated[FilterAppointments, Query()]
 
 
 def user_not_found(client=False, professional=False):
@@ -167,7 +168,7 @@ async def create_appointment(
 
 @router.get('/', status_code=HTTPStatus.OK, response_model=AppointmentList)
 async def get_appointments(
-    session: Session, user: CurrentUser, filter: FilterAppointments
+    session: Session, user: CurrentUser, filter: AppointmentFilter
 ):
     if user.role == UserRole.client:
         query = select(Appointment).where(Appointment.client == user)
@@ -181,7 +182,7 @@ async def get_appointments(
         query = query.filter(Appointment.client_id.contains(filter.client_id))
     if filter.professional_id:
         query = query.filter(
-            Appointment.profesisonal_id.contains(filter.professional_id)
+            Appointment.professional_id.contains(filter.professional_id)
         )
     if filter.service_id:
         query = query.filter(
