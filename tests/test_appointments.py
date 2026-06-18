@@ -373,7 +373,7 @@ def test_get_appointments_pagination(client, appointment, token_admin):
     assert response.json() == {'appointments': []}
 
 
-def test_update_appointments_appointment_not_found(client, token_admin):
+def test_update_appointment_appointment_not_found(client, token_admin):
     response = client.patch(
         '/appointments/67',
         json={},
@@ -384,7 +384,7 @@ def test_update_appointments_appointment_not_found(client, token_admin):
     assert response.json() == {'detail': 'Agendamento não encontrado.'}
 
 
-def test_update_appointments_forbidden_professional(
+def test_update_appointment_forbidden_professional(
     client, other_user, appointment
 ):
     other_user.role = UserRole.professional
@@ -408,7 +408,7 @@ def test_update_appointments_forbidden_professional(
     }
 
 
-def test_update_appointments_forbidden_client(client, other_user, appointment):
+def test_update_appointment_forbidden_client(client, other_user, appointment):
     token = client.post(
         '/auth/token',
         data={
@@ -429,7 +429,7 @@ def test_update_appointments_forbidden_client(client, other_user, appointment):
     }
 
 
-def test_update_appointments_admin(client, appointment, token_admin):
+def test_update_appointment_admin(client, appointment, token_admin):
     response = client.patch(
         f'/appointments/{appointment.id}',
         json={'start_time': '2001-09-11 09:03:00'},
@@ -440,7 +440,7 @@ def test_update_appointments_admin(client, appointment, token_admin):
     assert response.json()['end_time'] == '2001-09-11T09:13:00'
 
 
-def test_update_appointments_professional(
+def test_update_appointment_professional(
     client, appointment, token_professional
 ):
     response = client.patch(
@@ -453,7 +453,7 @@ def test_update_appointments_professional(
     assert response.json()['end_time'] == '2001-09-11T09:13:00'
 
 
-def test_update_appointments_client(client, appointment, token):
+def test_update_appointment_client(client, appointment, token):
     response = client.patch(
         f'/appointments/{appointment.id}',
         json={'start_time': '2001-09-11 09:03:00'},
@@ -464,7 +464,7 @@ def test_update_appointments_client(client, appointment, token):
     assert response.json()['end_time'] == '2001-09-11T09:13:00'
 
 
-def test_update_appointments_unavailable(  # noqa: PLR0913 PLR0917
+def test_update_appointment_unavailable(  # noqa: PLR0913 PLR0917
     client, other_user, professional, service, appointment, token_admin
 ):
     client.post(
@@ -488,3 +488,66 @@ def test_update_appointments_unavailable(  # noqa: PLR0913 PLR0917
     assert response.json() == {
         'detail': 'O profissional não tem disponibilidade nesse horário.'
     }
+
+
+def test_delete_appointment_not_found(client, token_admin):
+    response = client.delete(
+        '/appointments/67',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'Agendamento não encontrado.'}
+
+
+def test_delete_appointment_forbidden_professional(
+    client, other_user, appointment
+):
+    other_user.role = UserRole.professional
+    token = client.post(
+        '/auth/token',
+        data={
+            'username': other_user.email,
+            'password': other_user.clean_password,
+        },
+    ).json()['access_token']
+
+    response = client.delete(
+        f'/appointments/{appointment.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {
+        'detail': 'Você não tem permissão para deletar o agendamento.'
+    }
+
+
+def test_delete_appointment_forbidden_client(client, other_user, appointment):
+    token = client.post(
+        '/auth/token',
+        data={
+            'username': other_user.email,
+            'password': other_user.clean_password,
+        },
+    ).json()['access_token']
+
+    response = client.delete(
+        f'/appointments/{appointment.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {
+        'detail': 'Você não tem permissão para deletar o agendamento.'
+    }
+
+
+def test_delete_appointment(client, appointment, token_admin):
+    response = client.delete(
+        f'/appointments/{appointment.id}',
+        headers={'Authorization': f'Bearer {token_admin}'}
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'message': 'Agendamento deletado.'}

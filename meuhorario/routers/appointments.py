@@ -264,3 +264,41 @@ async def update_appointment(
     await session.refresh(appointment)
 
     return appointment
+
+
+@router.delete(
+    '/{appointment_id}', status_code=HTTPStatus.OK, response_model=dict
+)
+async def delete_appointment(
+    appointment_id: int, user: CurrentUser, session: Session
+):
+    appointment = await session.scalar(
+        select(Appointment).where(Appointment.id == appointment_id)
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail='Agendamento não encontrado.',
+        )
+
+    forbidden_exception = HTTPException(
+        status_code=HTTPStatus.FORBIDDEN,
+        detail='Você não tem permissão para deletar o agendamento.',
+    )
+
+    if user.role == UserRole.admin:
+        pass
+
+    elif user.role == UserRole.professional:
+        if appointment.professional != user:
+            raise forbidden_exception
+
+    elif user.role == UserRole.client:
+        if appointment.client != user:
+            raise forbidden_exception
+
+    await session.delete(appointment)
+    await session.commit()
+
+    return {'message': 'Agendamento deletado.'}
