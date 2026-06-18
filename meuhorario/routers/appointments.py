@@ -12,6 +12,7 @@ from meuhorario.schemas import (
     AppointmentList,
     AppointmentPublic,
     AppointmentSchema,
+    AppointmentUpdate,
     FilterAppointments,
 )
 from meuhorario.security import get_current_user
@@ -23,55 +24,28 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 AppointmentFilter = Annotated[FilterAppointments, Query()]
 
 
-def user_not_found(client=False, professional=False):
-    if client:
-        return HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail='Cliente não encontrado.',
-        )
-    elif professional:
-        return HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail='Profissional não encontrado.',
-        )
-    return HTTPException(
-        status_code=HTTPStatus.NOT_FOUND,
-        detail='Usuário não encontrado.',
-    )
-
-
-def unprocessable_entity(client=False, professional=False):
-    if client:
-        return HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail='O usuário não é do tipo cliente.',
-        )
-    elif professional:
-        return HTTPException(
-            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-            detail='O usuário não é do tipo profissional.',
-        )
-
-
-async def verify_availability(
-    session, client, professional, start_time, end_time
+async def verify_availability(  # noqa: PLR0913 PLR0917
+    session, client, professional, start_time, end_time, id=None
 ):
     client_appointments = await session.scalars(
         select(Appointment).where(Appointment.client_id == client.id)
     )
     for appointment in client_appointments:
-        overlap = max(
-            timedelta(0),
-            (
-                min(appointment.end_time, end_time)
-                - max(appointment.start_time, start_time)
-            ),
-        )
-        if overlap > timedelta(0):
-            raise HTTPException(
-                status_code=HTTPStatus.CONFLICT,
-                detail='O cliente não tem disponibilidade nesse horário.',
+        if id == appointment.id:
+            pass
+        else:
+            overlap = max(
+                timedelta(0),
+                (
+                    min(appointment.end_time, end_time)
+                    - max(appointment.start_time, start_time)
+                ),
             )
+            if overlap > timedelta(0):
+                raise HTTPException(
+                    status_code=HTTPStatus.CONFLICT,
+                    detail='O cliente não tem disponibilidade nesse horário.',
+                )
 
     professional_appointments = await session.scalars(
         select(Appointment).where(
@@ -79,18 +53,22 @@ async def verify_availability(
         )
     )
     for appointment in professional_appointments:
-        overlap = max(
-            timedelta(0),
-            (
-                min(appointment.end_time, end_time)
-                - max(appointment.start_time, start_time)
-            ),
-        )
-        if overlap > timedelta(0):
-            raise HTTPException(
-                status_code=HTTPStatus.CONFLICT,
-                detail='O profissional não tem disponibilidade nesse horário.',
+        if id == appointment.id:
+            pass
+        else:
+            overlap = max(
+                timedelta(0),
+                (
+                    min(appointment.end_time, end_time)
+                    - max(appointment.start_time, start_time)
+                ),
             )
+            if overlap > timedelta(0):
+                raise HTTPException(
+                    status_code=HTTPStatus.CONFLICT,
+                    detail='O profissional não tem '
+                    'disponibilidade nesse horário.',
+                )
 
 
 @router.post('/', status_code=HTTPStatus.OK, response_model=AppointmentPublic)
@@ -99,6 +77,34 @@ async def create_appointment(
     appointment_schema: AppointmentSchema,
     session: Session,
 ):
+    def user_not_found(client=False, professional=False):
+        if client:
+            return HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail='Cliente não encontrado.',
+            )
+        elif professional:
+            return HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail='Profissional não encontrado.',
+            )
+        return HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail='Usuário não encontrado.',
+        )
+
+    def unprocessable_entity(client=False, professional=False):
+        if client:
+            return HTTPException(
+                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+                detail='O usuário não é do tipo cliente.',
+            )
+        elif professional:
+            return HTTPException(
+                status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+                detail='O usuário não é do tipo profissional.',
+            )
+
     if user.role == UserRole.client:
         professional = await session.scalar(
             select(User).where(User.id == appointment_schema.professional_id)
@@ -194,3 +200,67 @@ async def get_appointments(
     )
 
     return {'appointments': appointments}
+
+
+@router.patch(
+    '/{appointment_id}',
+    status_code=HTTPStatus.OK,
+    response_model=AppointmentPublic,
+)
+async def update_appointment(
+    session: Session,
+    appointment_id: int,
+    schema: AppointmentUpdate,
+    user: CurrentUser,
+):
+    appointment = await session.scalar(
+        select(Appointment).where(Appointment.id == appointment_id)
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail='Agendamento não encontrado.',
+        )
+
+    def update():
+        for key, value in schema.model_dump(exclude_unset=True).items():
+            setattr(appointment, key, value)
+
+    forbidden_exception = HTTPException(
+        status_code=HTTPStatus.FORBIDDEN,
+        detail='Você não tem permissão para atualizar o agendamento.',
+    )
+
+    if user.role == UserRole.admin:
+        update()
+
+    elif user.role == UserRole.professional:
+        if appointment.professional_id != user.id:
+            raise forbidden_exception
+        update()
+
+    elif user.role == UserRole.client:
+        if appointment.client_id != user.id:
+            raise forbidden_exception
+        update()
+
+    end_time = appointment.start_time + timedelta(
+        minutes=appointment.service.duration
+    )
+    appointment.end_time = end_time
+
+    await verify_availability(
+        session,
+        appointment.client,
+        appointment.professional,
+        appointment.start_time,
+        appointment.end_time,
+        id=appointment.id,
+    )
+
+    session.add(appointment)
+    await session.commit()
+    await session.refresh(appointment)
+
+    return appointment

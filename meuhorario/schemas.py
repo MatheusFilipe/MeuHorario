@@ -78,3 +78,8 @@ class AppointmentPublic(AppointmentSchema):
 
 class AppointmentList(BaseModel):
     appointments: list[AppointmentPublic]
+
+
+class AppointmentUpdate(BaseModel):
+    service_id: int | None = None
+    start_time: datetime | None = None
