@@ -108,7 +108,7 @@ export async function registerUser({ first_name, last_name, email, password }) {
  * Usamos esta rota para listar usuários. Não exige permissão no backend,
  * mas utilizaremos para encontrar os detalhes do usuário logado através do e-mail.
  */
-export async function fetchUsers() {
+export async function fetchUsers(token) {
   const url = `${API_BASE_URL}/users/?offset=0&limit=100`;
 
   console.log(`[API] Buscando lista de usuários de: ${url}`);
@@ -117,6 +117,7 @@ export async function fetchUsers() {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
   });
 
@@ -133,26 +134,197 @@ export async function fetchUsers() {
 /**
  * 4. BUSCAR PERFIL DO USUÁRIO LOGADO
  * 
- * Fluxo didático:
- * - A partir do token de acesso salvo, decodificamos o e-mail do usuário.
- * - Fazemos a busca dos usuários cadastrados.
- * - Filtramos a lista para retornar o usuário que coincide com o e-mail decodificado do token.
+ * Agora integrando com a rota segura GET /users/me do backend.
  */
 export async function fetchLoggedInUserProfile(token) {
-  const payload = decodeTokenPayload(token);
-  if (!payload || !payload.sub) {
-    throw new Error('Token inválido ou expirado.');
+  const url = `${API_BASE_URL}/users/me`;
+
+  console.log(`[API] Buscando perfil do usuário logado de: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao obter perfil do usuário.';
+    throw new Error(message);
   }
 
-  const loggedInEmail = payload.sub; // O email está no campo 'sub'
-  console.log(`[API] Email extraído do token: ${loggedInEmail}. Buscando dados cadastrais...`);
+  return await response.json();
+}
 
-  const data = await fetchUsers();
-  const matchedUser = data.users.find(user => user.email === loggedInEmail);
+/**
+ * 5. ATUALIZAR DADOS DO USUÁRIO (PUT /users/{id})
+ */
+export async function updateUser(userId, { first_name, last_name, email, password }, token) {
+  const url = `${API_BASE_URL}/users/${userId}`;
 
-  if (!matchedUser) {
-    throw new Error('Perfil do usuário não encontrado na lista do servidor.');
+  const bodyData = {
+    first_name,
+    last_name,
+    email,
+    password,
+  };
+
+  console.log(`[API] Atualizando usuário ${userId} em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao atualizar dados.';
+    throw new Error(message);
   }
 
-  return matchedUser;
+  return await response.json();
+}
+
+/**
+ * 6. DELETAR PERFIL DO USUÁRIO (DELETE /users/{id})
+ */
+export async function deleteUser(userId, token) {
+  const url = `${API_BASE_URL}/users/${userId}`;
+
+  console.log(`[API] Deletando usuário ${userId} em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao deletar usuário.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 7. BUSCAR TODOS OS SERVIÇOS (GET /services/)
+ */
+export async function fetchServices() {
+  const url = `${API_BASE_URL}/services/`;
+
+  console.log(`[API] Buscando lista de serviços de: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao obter lista de serviços.';
+    throw new Error(message);
+  }
+
+  // Retorna { services: [...] }
+  return await response.json();
+}
+
+/**
+ * 8. CRIAR NOVO SERVIÇO (POST /services/)
+ */
+export async function createService({ name, duration, price }, token) {
+  const url = `${API_BASE_URL}/services/`;
+
+  const bodyData = {
+    name,
+    duration: parseInt(duration),
+    price: parseFloat(price),
+  };
+
+  console.log(`[API] Criando serviço em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao criar serviço.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 9. ATUALIZAR SERVIÇO (PATCH /services/{id})
+ */
+export async function updateService(serviceId, serviceData, token) {
+  const url = `${API_BASE_URL}/services/${serviceId}`;
+
+  const bodyData = {};
+  if (serviceData.name !== undefined) bodyData.name = serviceData.name;
+  if (serviceData.duration !== undefined) bodyData.duration = parseInt(serviceData.duration);
+  if (serviceData.price !== undefined) bodyData.price = parseFloat(serviceData.price);
+
+  console.log(`[API] Atualizando serviço ${serviceId} em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao atualizar serviço.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 10. DELETAR SERVIÇO (DELETE /services/{id})
+ */
+export async function deleteService(serviceId, token) {
+  const url = `${API_BASE_URL}/services/${serviceId}`;
+
+  console.log(`[API] Deletando serviço ${serviceId} em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao deletar serviço.';
+    throw new Error(message);
+  }
+
+  return await response.json();
 }

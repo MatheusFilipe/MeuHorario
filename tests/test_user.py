@@ -40,24 +40,43 @@ def test_post_user_already_exists(client, user):
     assert response.json() == {'detail': 'E-mail já cadastrado.'}
 
 
-def test_get_users_with_user(client, user):
-    response = client.get('/users/')
+def test_get_users_with_user(client, user, token_admin):
+    response = client.get(
+        '/users/',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    users = response.json()['users']
+    assert any(u['id'] == user.id for u in users)
+
+
+def test_get_users_forbidden(client, token):
+    response = client.get(
+        '/users/',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Você não tem permissão.'}
+
+
+def test_get_current_user_profile(client, user, token):
+    response = client.get(
+        '/users/me',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     user_schema = UserPublic.model_validate(user).model_dump()
-
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': [user_schema]}
+    assert response.json() == user_schema
 
 
-def test_get_users_empty(client):
-    response = client.get('/users/')
-
-    assert response.status_code == HTTPStatus.OK
-    assert response.json() == {'users': []}
-
-
-def test_get_user(client, user):
-    response = client.get(f'/users/{user.id}')
+def test_get_user(client, user, token):
+    response = client.get(
+        f'/users/{user.id}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
 
     user_schema = UserPublic.model_validate(user).model_dump()
 
@@ -65,8 +84,11 @@ def test_get_user(client, user):
     assert response.json() == user_schema
 
 
-def test_get_user_invalid_id(client):
-    response = client.get('/users/1')
+def test_get_user_invalid_id(client, token_admin):
+    response = client.get(
+        '/users/67',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
 
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert response.json() == {'detail': 'Usuário não encontrado.'}
@@ -137,11 +159,22 @@ def test_delete_user(client, user, token):
 
 def test_delete_user_wrong_user(client, other_user, token):
     response = client.delete(
-        f'/users/{other_user.id}', headers={'Authorization': f'Bearer {token}'}
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'},
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN
     assert response.json() == {'detail': 'Você não tem permissão.'}
+
+
+def test_delete_user_as_admin(client, other_user, token_admin):
+    response = client.delete(
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'message': 'Usuário deletado.'}
 
 
 def test_create_user_professional(client, token_admin):

@@ -45,8 +45,22 @@ async def create_user(user: UserSchema, session: Session):
     return db_user
 
 
+@router.get('/me', status_code=HTTPStatus.OK, response_model=UserPublic)
+async def get_current_user_profile(current_user: CurrentUser):
+    return current_user
+
+
 @router.get('/{user_id}', status_code=HTTPStatus.OK, response_model=UserPublic)
-async def get_user(user_id: int, session: Session):
+async def get_user(
+    user_id: int,
+    session: Session,
+    current_user: CurrentUser,
+):
+    if current_user.id != user_id and current_user.role != UserRole.admin:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
+        )
+
     user = await session.scalar(select(User).where(User.id == user_id))
 
     if not user:
@@ -58,7 +72,16 @@ async def get_user(user_id: int, session: Session):
 
 
 @router.get('/', status_code=HTTPStatus.OK, response_model=UserList)
-async def get_users(session: Session, filter_users: FilterPage):
+async def get_users(
+    session: Session,
+    filter_users: FilterPage,
+    current_user: CurrentUser,
+):
+    if current_user.role != UserRole.admin:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
+        )
+
     users = await session.scalars(
         select(User).limit(filter_users.limit).offset(filter_users.offset)
     )
@@ -105,12 +128,24 @@ async def delete_user(
     session: Session,
     current_user: CurrentUser,
 ):
-    if current_user.id != user_id:
+    if current_user.id != user_id and current_user.role != UserRole.admin:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail='Você não tem permissão.'
         )
 
-    await session.delete(current_user)
+    if current_user.id == user_id:
+        user_to_delete = current_user
+    else:
+        user_to_delete = await session.scalar(
+            select(User).where(User.id == user_id)
+        )
+        if not user_to_delete:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail='Usuário não encontrado.',
+            )
+
+    await session.delete(user_to_delete)
     await session.commit()
 
     return {'message': 'Usuário deletado.'}
