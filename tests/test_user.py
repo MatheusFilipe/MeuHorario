@@ -94,6 +94,16 @@ def test_get_user_invalid_id(client, token_admin):
     assert response.json() == {'detail': 'Usuário não encontrado.'}
 
 
+def test_get_user_other_user(client, token, other_user):
+    response = client.get(
+        f'/users/{other_user.id}',
+        headers={'Authorization': f'Bearer {token}'}
+    )
+
+    assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json() == {'detail': 'Você não tem permissão.'}
+
+
 def test_update_user(client, user, token):
     response = client.put(
         f'/users/{user.id}',
@@ -175,6 +185,16 @@ def test_delete_user_as_admin(client, other_user, token_admin):
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'message': 'Usuário deletado.'}
+
+
+def test_delete_user_not_user_to_delete(client, token_admin):
+    response = client.delete(
+        '/users/67',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'Usuário não encontrado.'}
 
 
 def test_create_user_professional(client, token_admin):

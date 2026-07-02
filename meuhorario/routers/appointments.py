@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import time, timedelta
 from http import HTTPStatus
 from typing import Annotated
 
@@ -23,10 +23,30 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 Session = Annotated[AsyncSession, Depends(get_session)]
 AppointmentFilter = Annotated[FilterAppointments, Query()]
 
+business_hours = {
+    0: (time(8, 0), time(18, 0)),  # Monday
+    1: (time(8, 0), time(18, 0)),  # Tuesday
+    2: (time(8, 0), time(18, 0)),  # Wednesday
+    3: (time(8, 0), time(18, 0)),  # Thursday
+    4: (time(8, 0), time(18, 0)),  # Friday
+    5: (time(8, 0), time(16, 0)),  # Saturday
+}
+
 
 async def verify_availability(  # noqa: PLR0913 PLR0917
     session, client, professional, start_time, end_time, id=None
 ):
+    out_of_business_hours_exception = HTTPException(
+        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        detail='Fora do horário de funcionamento.'
+    )
+
+    if start_time.weekday() not in business_hours.keys():
+        raise out_of_business_hours_exception
+    business_start, business_end = business_hours[start_time.weekday()]
+    if start_time.time() < business_start or end_time.time() > business_end:
+        raise out_of_business_hours_exception
+
     client_appointments = await session.scalars(
         select(Appointment).where(Appointment.client_id == client.id)
     )

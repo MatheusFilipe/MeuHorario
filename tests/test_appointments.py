@@ -269,6 +269,42 @@ def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
     }
 
 
+def test_verify_availability_sunday(
+        client, user, professional, service, token_admin
+):
+    response = client.post(
+        '/appointments/',
+        json={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+            'start_time': '1972-01-30 15:00:00'
+        },
+        headers={'Authorization': f'Bearer {token_admin}'}
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json() == {'detail': 'Fora do horário de funcionamento.'}
+
+
+def test_verify_availability_out_of_business_hour(
+        client, user, professional, service, token_admin
+):
+    response = client.post(
+        '/appointments/',
+        json={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+            'start_time': '2001-09-11 03:00:00'
+        },
+        headers={'Authorization': f'Bearer {token_admin}'}
+    )
+
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json() == {'detail': 'Fora do horário de funcionamento.'}
+
+
 def test_get_appointments_empty(client, token_admin):
     response = client.get(
         '/appointments/',
