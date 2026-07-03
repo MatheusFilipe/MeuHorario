@@ -75,6 +75,8 @@ class AppointmentPublic(AppointmentSchema):
     end_time: datetime
     id: int
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class AppointmentList(BaseModel):
     appointments: list[AppointmentPublic]

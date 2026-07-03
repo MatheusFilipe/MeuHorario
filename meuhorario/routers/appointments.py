@@ -205,14 +205,14 @@ async def get_appointments(
         query = select(Appointment)
 
     if filter.client_id:
-        query = query.filter(Appointment.client_id.contains(filter.client_id))
+        query = query.filter(Appointment.client_id == filter.client_id)
     if filter.professional_id:
         query = query.filter(
-            Appointment.professional_id.contains(filter.professional_id)
+            Appointment.professional_id == filter.professional_id
         )
     if filter.service_id:
         query = query.filter(
-            Appointment.service_id.contains(filter.service_id)
+            Appointment.service_id == filter.service_id
         )
 
     appointments = await session.scalars(
