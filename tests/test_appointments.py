@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from meuhorario.models import UserRole
+from meuhorario.schemas import UserPublic
 
 
 def test_client_create_appointment_invalid_professional_id(
@@ -270,7 +271,7 @@ def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
 
 
 def test_verify_availability_sunday(
-        client, user, professional, service, token_admin
+    client, user, professional, service, token_admin
 ):
     response = client.post(
         '/appointments/',
@@ -278,9 +279,9 @@ def test_verify_availability_sunday(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '1972-01-30 15:00:00'
+            'start_time': '1972-01-30 15:00:00',
         },
-        headers={'Authorization': f'Bearer {token_admin}'}
+        headers={'Authorization': f'Bearer {token_admin}'},
     )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
@@ -288,7 +289,7 @@ def test_verify_availability_sunday(
 
 
 def test_verify_availability_out_of_business_hour(
-        client, user, professional, service, token_admin
+    client, user, professional, service, token_admin
 ):
     response = client.post(
         '/appointments/',
@@ -296,9 +297,9 @@ def test_verify_availability_out_of_business_hour(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 03:00:00'
+            'start_time': '2001-09-11 03:00:00',
         },
-        headers={'Authorization': f'Bearer {token_admin}'}
+        headers={'Authorization': f'Bearer {token_admin}'},
     )
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
@@ -582,8 +583,58 @@ def test_delete_appointment_forbidden_client(client, other_user, appointment):
 def test_delete_appointment(client, appointment, token_admin):
     response = client.delete(
         f'/appointments/{appointment.id}',
-        headers={'Authorization': f'Bearer {token_admin}'}
+        headers={'Authorization': f'Bearer {token_admin}'},
     )
 
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {'message': 'Agendamento deletado.'}
+
+
+def test_selection_as_client(client, professional, token):
+    response = client.get(
+        '/appointments/selection', headers={'Authorization': f'Bearer {token}'}
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        'clients': [],
+        'professionals': [
+            UserPublic.model_validate(professional).model_dump()
+        ],
+    }
+
+
+def test_selection_as_professional(client, user, token_professional):
+    response = client.get(
+        '/appointments/selection',
+        headers={'Authorization': f'Bearer {token_professional}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        'clients': [UserPublic.model_validate(user).model_dump()],
+        'professionals': [],
+    }
+
+
+def test_selection_as_admin(client, user, professional, token_admin):
+    response = client.get(
+        '/appointments/selection',
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        'clients': [UserPublic.model_validate(user).model_dump()],
+        'professionals': [
+            UserPublic.model_validate(professional).model_dump()
+        ],
+    }
+
+
+def test_selection_unauthenticated(client):
+    response = client.get('/appointments/selection')
+    print(response.status_code)
+    print(response.json())
+
+    assert response.status_code == HTTPStatus.UNAUTHORIZED

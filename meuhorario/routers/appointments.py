@@ -14,6 +14,7 @@ from meuhorario.schemas import (
     AppointmentSchema,
     AppointmentUpdate,
     FilterAppointments,
+    SelectionResponse,
 )
 from meuhorario.security import get_current_user
 
@@ -38,7 +39,7 @@ async def verify_availability(  # noqa: PLR0913 PLR0917
 ):
     out_of_business_hours_exception = HTTPException(
         status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-        detail='Fora do horário de funcionamento.'
+        detail='Fora do horário de funcionamento.',
     )
 
     if start_time.weekday() not in business_hours.keys():
@@ -89,6 +90,32 @@ async def verify_availability(  # noqa: PLR0913 PLR0917
                     detail='O profissional não tem '
                     'disponibilidade nesse horário.',
                 )
+
+
+@router.get(
+    '/selection', status_code=HTTPStatus.OK, response_model=SelectionResponse
+)
+async def selection(user: CurrentUser, session: Session):
+    clients = []
+    professionals = []
+
+    if user.role == UserRole.client:
+        professionals = await session.scalars(
+            select(User).where(User.role == UserRole.professional)
+        )
+    elif user.role == UserRole.professional:
+        clients = await session.scalars(
+            select(User).where(User.role == UserRole.client)
+        )
+    elif user.role == UserRole.admin:
+        clients = await session.scalars(
+            select(User).where(User.role == UserRole.client)
+        )
+        professionals = await session.scalars(
+            select(User).where(User.role == UserRole.professional)
+        )
+
+    return {'clients': clients, 'professionals': professionals}
 
 
 @router.post('/', status_code=HTTPStatus.OK, response_model=AppointmentPublic)
@@ -211,9 +238,7 @@ async def get_appointments(
             Appointment.professional_id == filter.professional_id
         )
     if filter.service_id:
-        query = query.filter(
-            Appointment.service_id == filter.service_id
-        )
+        query = query.filter(Appointment.service_id == filter.service_id)
 
     appointments = await session.scalars(
         query.offset(filter.offset).limit(filter.limit)

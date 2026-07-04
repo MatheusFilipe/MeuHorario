@@ -96,8 +96,7 @@ def test_get_user_invalid_id(client, token_admin):
 
 def test_get_user_other_user(client, token, other_user):
     response = client.get(
-        f'/users/{other_user.id}',
-        headers={'Authorization': f'Bearer {token}'}
+        f'/users/{other_user.id}', headers={'Authorization': f'Bearer {token}'}
     )
 
     assert response.status_code == HTTPStatus.FORBIDDEN

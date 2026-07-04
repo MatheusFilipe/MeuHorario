@@ -85,3 +85,8 @@ class AppointmentList(BaseModel):
 class AppointmentUpdate(BaseModel):
     service_id: int | None = None
     start_time: datetime | None = None
+
+
+class SelectionResponse(BaseModel):
+    clients: list[UserPublic]
+    professionals: list[UserPublic]
