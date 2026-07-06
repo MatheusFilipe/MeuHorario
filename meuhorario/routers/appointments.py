@@ -1,4 +1,4 @@
-from datetime import time, timedelta
+from datetime import date, datetime, time, timedelta
 from http import HTTPStatus
 from typing import Annotated
 
@@ -15,6 +15,7 @@ from meuhorario.schemas import (
     AppointmentUpdate,
     FilterAppointments,
     SelectionResponse,
+    WeekSlotsResponse,
 )
 from meuhorario.security import get_current_user
 
@@ -43,10 +44,10 @@ async def verify_availability(  # noqa: PLR0913 PLR0917
     )
 
     if start_time.weekday() not in business_hours.keys():
-        raise out_of_business_hours_exception
+        return out_of_business_hours_exception
     business_start, business_end = business_hours[start_time.weekday()]
     if start_time.time() < business_start or end_time.time() > business_end:
-        raise out_of_business_hours_exception
+        return out_of_business_hours_exception
 
     client_appointments = await session.scalars(
         select(Appointment).where(Appointment.client_id == client.id)
@@ -63,7 +64,7 @@ async def verify_availability(  # noqa: PLR0913 PLR0917
                 ),
             )
             if overlap > timedelta(0):
-                raise HTTPException(
+                return HTTPException(
                     status_code=HTTPStatus.CONFLICT,
                     detail='O cliente não tem disponibilidade nesse horário.',
                 )
@@ -85,11 +86,12 @@ async def verify_availability(  # noqa: PLR0913 PLR0917
                 ),
             )
             if overlap > timedelta(0):
-                raise HTTPException(
+                return HTTPException(
                     status_code=HTTPStatus.CONFLICT,
                     detail='O profissional não tem '
                     'disponibilidade nesse horário.',
                 )
+    return None
 
 
 @router.get(
@@ -200,9 +202,11 @@ async def create_appointment(
         minutes=service.duration
     )
 
-    await verify_availability(
+    exception = await verify_availability(
         session, client, professional, start_time, end_time
     )
+    if exception is not None:
+        raise exception
 
     appointment = Appointment(
         client_id=client.id,
@@ -225,7 +229,6 @@ async def get_appointments(
 ):
     if user.role == UserRole.client:
         query = select(Appointment).where(Appointment.client == user)
-
     elif user.role == UserRole.professional:
         query = select(Appointment).where(Appointment.professional == user)
     elif user.role == UserRole.admin:
@@ -295,7 +298,7 @@ async def update_appointment(
     )
     appointment.end_time = end_time
 
-    await verify_availability(
+    exception = await verify_availability(
         session,
         appointment.client,
         appointment.professional,
@@ -303,6 +306,8 @@ async def update_appointment(
         appointment.end_time,
         id=appointment.id,
     )
+    if exception is not None:
+        raise exception
 
     session.add(appointment)
     await session.commit()
@@ -347,3 +352,76 @@ async def delete_appointment(
     await session.commit()
 
     return {'message': 'Agendamento deletado.'}
+
+
+@router.get(
+    '/slots',
+    status_code=HTTPStatus.OK,
+    response_model=WeekSlotsResponse,
+)
+async def get_appointments_grade(
+    session: Session, filter: AppointmentFilter, user: CurrentUser
+):
+    client_id = filter.client_id
+    professional_id = filter.professional_id
+    if user.role == UserRole.client:
+        client_id = user.id
+    elif user.role == UserRole.professional:
+        professional_id = user.id
+    elif user.role == UserRole.admin:
+        pass
+
+    client = await session.scalar(select(User).where(User.id == client_id))
+    if not client:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Cliente não encontrado.'
+        )
+    professional = await session.scalar(
+        select(User).where(User.id == professional_id)
+    )
+    if not professional:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail='Profissional não encontrado.',
+        )
+    service = await session.scalar(
+        select(Service).where(Service.id == filter.service_id)
+    )
+    if not service:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Serviço não encontrado.'
+        )
+
+    start_time = time(8, 0)
+    end_time = time(18, 0)
+    start_of_week = date.today()
+    end_of_week = start_of_week + timedelta(days=6)
+
+    week_slots = []
+    day = start_of_week
+    while day <= end_of_week:
+        day_slots = []
+        current_dt = datetime.combine(day, start_time)
+        end_dt = datetime.combine(day, end_time)
+        while current_dt < end_dt:
+            available = (
+                True
+                if await verify_availability(
+                    session,
+                    client,
+                    professional,
+                    current_dt,
+                    current_dt + timedelta(minutes=service.duration),
+                )
+                is None
+                else False
+            )
+            day_slots.append({
+                'start_time': current_dt,
+                'available': available,
+            })
+            current_dt += timedelta(minutes=15)
+        week_slots.append({'date': day, 'slots': day_slots})
+        day += timedelta(days=1)
+
+    return {'days': week_slots}

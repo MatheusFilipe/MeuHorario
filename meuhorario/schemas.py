@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -90,3 +90,17 @@ class AppointmentUpdate(BaseModel):
 class SelectionResponse(BaseModel):
     clients: list[UserPublic]
     professionals: list[UserPublic]
+
+
+class SlotSchema(BaseModel):
+    start_time: datetime
+    available: bool
+
+
+class DaySchema(BaseModel):
+    date: date
+    slots: list[SlotSchema]
+
+
+class WeekSlotsResponse(BaseModel):
+    days: list[DaySchema]

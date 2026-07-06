@@ -1,3 +1,4 @@
+from datetime import date
 from http import HTTPStatus
 
 from meuhorario.models import UserRole
@@ -634,7 +635,81 @@ def test_selection_as_admin(client, user, professional, token_admin):
 
 def test_selection_unauthenticated(client):
     response = client.get('/appointments/selection')
-    print(response.status_code)
-    print(response.json())
 
     assert response.status_code == HTTPStatus.UNAUTHORIZED
+
+
+def test_slots_returns_7_days(client, token, professional, service):
+    response = client.get(
+        '/appointments/slots',
+        params={'professional_id': professional.id, 'service_id': service.id},
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    week_length = 7
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json()['days']) == week_length
+
+
+def test_slots_sunday_unavailable(client, token, professional, service):
+    filter = f'professional_id={professional.id}&service_id={service.id}'
+    response = client.get(
+        f'/appointments/slots?{filter}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    sunday_weekday = 6
+    for day in response.json()['days']:
+        if date.fromisoformat(day['date']).weekday() == sunday_weekday:
+            sunday = day
+
+    assert response.status_code == HTTPStatus.OK
+    assert not sunday['slots'][0]['available']
+
+
+def test_slots_existing_appointment_blocks_slot(
+    client, token, appointment, professional, service
+):
+    filter = f'professional_id={professional.id}&service_id={service.id}'
+    response = client.get(
+        f'/appointments/slots?{filter}',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    for day in response.json()['days']:
+        if (
+            date.fromisoformat(day['date']).weekday()
+            == appointment.start_time.weekday()
+        ):
+            appointment_day = day
+
+    for slot in appointment_day['slots']:
+        if slot['start_time'] == appointment.start_time:
+            appointment_slot = slot
+
+    assert response.status_code == HTTPStatus.OK
+    assert not appointment_slot['available']
+
+
+def test_slots_as_professional(client, token_professional, user, service):
+    response = client.get(
+        '/appointments/slots',
+        params={'client_id': user.id, 'service_id': service.id},
+        headers={'Authorization': f'Bearer {token_professional}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+
+
+def test_slots_as_admin(client, token_admin, user, professional, service):
+    response = client.get(
+        '/appointments/slots',
+        params={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
