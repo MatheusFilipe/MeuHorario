@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 import factory
 import pytest
@@ -63,7 +63,7 @@ async def session():
 
 
 @contextmanager
-def _mock_db_time(*, model, time=datetime(2001, 9, 11)):
+def _mock_db_time(*, model, time):
     def fake_time_hook(mapper, connection, target):
         if hasattr(target, 'created_at'):
             target.created_at = time
@@ -74,8 +74,46 @@ def _mock_db_time(*, model, time=datetime(2001, 9, 11)):
 
 
 @pytest.fixture
-def mock_db_time():
-    return _mock_db_time
+def next_business_day_8am():
+    today = date.today()
+    match today.weekday():
+        case 5:  # Saturday
+            days_remaining = 2
+        case _:
+            days_remaining = 1
+
+    return datetime.combine(
+        today + timedelta(days=days_remaining), time(8, 0)
+    ).isoformat()
+
+
+@pytest.fixture
+def next_business_day_after_service(next_business_day_8am, service):
+    return (
+        datetime.fromisoformat(next_business_day_8am)
+        + timedelta(minutes=service.duration)
+    ).isoformat()
+
+
+@pytest.fixture
+def next_sunday_8am():
+    today = date.today()
+    days_remaining = 6 - today.weekday()
+    if days_remaining == 0:
+        days_remaining = 7
+
+    return datetime.combine(
+        today + timedelta(days=days_remaining), time(8, 0)
+    ).isoformat()
+
+
+@pytest.fixture
+def mock_db_time(next_business_day_8am):
+    return (
+        lambda *, model, time=datetime.fromisoformat(next_business_day_8am): (
+            _mock_db_time(model=model, time=time)
+        )
+    )
 
 
 @pytest_asyncio.fixture
@@ -146,8 +184,10 @@ async def service(session):
 
 
 @pytest_asyncio.fixture
-async def appointment(user, professional, service, session):
-    start_time = datetime(2001, 9, 11, 8, 46)
+async def appointment(
+    user, professional, service, session, next_business_day_8am
+):
+    start_time = datetime.fromisoformat(next_business_day_8am)
     end_time = start_time + timedelta(minutes=service.duration)
     appointment = Appointment(
         client_id=user.id,

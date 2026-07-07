@@ -38,6 +38,11 @@ business_hours = {
 async def verify_availability(  # noqa: PLR0913 PLR0917
     session, client, professional, start_time, end_time, id=None
 ):
+    if start_time < datetime.now():
+        return HTTPException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail='Não é possível fazer um agendamento em datas passadas.',
+        )
     out_of_business_hours_exception = HTTPException(
         status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
         detail='Fora do horário de funcionamento.',
@@ -121,7 +126,7 @@ async def selection(user: CurrentUser, session: Session):
 
 
 @router.post('/', status_code=HTTPStatus.OK, response_model=AppointmentPublic)
-async def create_appointment(
+async def create_appointment(  # noqa: PLR0912
     user: CurrentUser,
     appointment_schema: AppointmentSchema,
     session: Session,
@@ -153,6 +158,12 @@ async def create_appointment(
                 status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
                 detail='O usuário não é do tipo profissional.',
             )
+
+    if appointment_schema.start_time < datetime.now():
+        raise HTTPException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail='Não é possível fazer um agendamento em datas passadas.',
+        )
 
     if user.role == UserRole.client:
         professional = await session.scalar(

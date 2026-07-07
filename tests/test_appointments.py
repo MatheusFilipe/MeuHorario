@@ -1,12 +1,12 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 
 from meuhorario.models import UserRole
 from meuhorario.schemas import UserPublic
 
 
-def test_client_create_appointment_invalid_professional_id(
-    client, user, service, token
+def test_create_appointment_as_client_professional_not_found(
+    client, user, service, token, next_business_day_8am
 ):
     response = client.post(
         '/appointments/',
@@ -14,7 +14,7 @@ def test_client_create_appointment_invalid_professional_id(
             'client_id': user.id,
             'professional_id': 67,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -23,8 +23,8 @@ def test_client_create_appointment_invalid_professional_id(
     assert response.json() == {'detail': 'Usuário não encontrado.'}
 
 
-def test_client_create_appointment_unprocessable_entity(
-    client, user, service, token, other_user
+def test_create_appointment_as_client_unprocessable_entity(  # noqa: PLR0913 PLR0917
+    client, user, service, token, other_user, next_business_day_8am
 ):
     response = client.post(
         '/appointments/',
@@ -32,7 +32,7 @@ def test_client_create_appointment_unprocessable_entity(
             'client_id': user.id,
             'professional_id': other_user.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -43,14 +43,22 @@ def test_client_create_appointment_unprocessable_entity(
     }
 
 
-def test_client_create_appointment(client, token, user, professional, service):
+def test_create_appointment_as_client(  # noqa: PLR0913 PLR0917
+    client,
+    token,
+    user,
+    professional,
+    service,
+    next_business_day_8am,
+    next_business_day_after_service,
+):
     response = client.post(
         '/appointments/',
         json={
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -61,13 +69,13 @@ def test_client_create_appointment(client, token, user, professional, service):
         'client_id': user.id,
         'professional_id': professional.id,
         'service_id': service.id,
-        'start_time': '2001-09-11T08:46:00',
-        'end_time': '2001-09-11T08:56:00',
+        'start_time': next_business_day_8am,
+        'end_time': next_business_day_after_service,
     }
 
 
-def test_professional_create_appointment_invalid_client_id(
-    client, professional, service, token_professional
+def test_create_appointment_as_professional_client_not_found(
+    client, professional, service, token_professional, next_business_day_8am
 ):
     response = client.post(
         '/appointments/',
@@ -75,7 +83,7 @@ def test_professional_create_appointment_invalid_client_id(
             'client_id': 67,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -84,8 +92,13 @@ def test_professional_create_appointment_invalid_client_id(
     assert response.json() == {'detail': 'Usuário não encontrado.'}
 
 
-def test_professional_create_appointment_unprocessable_entity(
-    client, professional, service, token_professional, other_user
+def test_create_appointment_as_professional_unprocessable_entity(  # noqa: PLR0913 PLR0917
+    client,
+    professional,
+    service,
+    token_professional,
+    other_user,
+    next_business_day_8am,
 ):
     other_user.role = UserRole.professional
 
@@ -95,7 +108,7 @@ def test_professional_create_appointment_unprocessable_entity(
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -104,8 +117,14 @@ def test_professional_create_appointment_unprocessable_entity(
     assert response.json() == {'detail': 'O usuário não é do tipo cliente.'}
 
 
-def test_professional_create_appointment(
-    client, token_professional, user, professional, service
+def test_create_appointment_as_professional(  # noqa: PLR0913 PLR0917
+    client,
+    token_professional,
+    user,
+    professional,
+    service,
+    next_business_day_8am,
+    next_business_day_after_service,
 ):
     response = client.post(
         '/appointments/',
@@ -113,7 +132,7 @@ def test_professional_create_appointment(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_professional}'},
     )
@@ -124,13 +143,13 @@ def test_professional_create_appointment(
         'client_id': user.id,
         'professional_id': professional.id,
         'service_id': service.id,
-        'start_time': '2001-09-11T08:46:00',
-        'end_time': '2001-09-11T08:56:00',
+        'start_time': next_business_day_8am,
+        'end_time': next_business_day_after_service,
     }
 
 
-def test_admin_create_appointment_invalid_client_id(
-    client, professional, service, token_admin
+def test_create_appointment_as_admin_client_not_found(
+    client, professional, service, token_admin, next_business_day_8am
 ):
     response = client.post(
         '/appointments/',
@@ -138,7 +157,7 @@ def test_admin_create_appointment_invalid_client_id(
             'client_id': 67,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -147,8 +166,8 @@ def test_admin_create_appointment_invalid_client_id(
     assert response.json() == {'detail': 'Cliente não encontrado.'}
 
 
-def test_admin_create_appointment_invalid_professional_id(
-    client, user, service, token_admin
+def test_create_appointment_as_admin_professional_not_found(
+    client, user, service, token_admin, next_business_day_8am
 ):
     response = client.post(
         '/appointments/',
@@ -156,7 +175,7 @@ def test_admin_create_appointment_invalid_professional_id(
             'client_id': user.id,
             'professional_id': 67,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -165,8 +184,13 @@ def test_admin_create_appointment_invalid_professional_id(
     assert response.json() == {'detail': 'Profissional não encontrado.'}
 
 
-def test_admin_create_appointment_unprocessable_entity_client(
-    client, professional, service, token_admin, other_user
+def test_create_appointment_as_admin_unprocessable_entity_client(  # noqa: PLR0913 PLR0917
+    client,
+    professional,
+    service,
+    token_admin,
+    other_user,
+    next_business_day_8am,
 ):
     other_user.role = UserRole.professional
 
@@ -176,7 +200,7 @@ def test_admin_create_appointment_unprocessable_entity_client(
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -185,8 +209,8 @@ def test_admin_create_appointment_unprocessable_entity_client(
     assert response.json() == {'detail': 'O usuário não é do tipo cliente.'}
 
 
-def test_admin_create_appointment_unprocessable_entity_professional(
-    client, user, service, token_admin, other_user
+def test_create_appointment_as_admin_unprocessable_entity_professional(  # noqa: PLR0913 PLR0917
+    client, user, service, token_admin, other_user, next_business_day_8am
 ):
 
     response = client.post(
@@ -195,7 +219,7 @@ def test_admin_create_appointment_unprocessable_entity_professional(
             'client_id': user.id,
             'professional_id': other_user.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:46:00',
+            'start_time': next_business_day_8am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -206,8 +230,43 @@ def test_admin_create_appointment_unprocessable_entity_professional(
     }
 
 
-def test_admin_create_appointment(
-    client, token_admin, user, professional, service
+def test_create_appointment_as_admin(  # noqa: PLR0913 PLR0917
+    client,
+    token_admin,
+    user,
+    professional,
+    service,
+    next_business_day_8am,
+    next_business_day_after_service,
+):
+    response = client.post(
+        '/appointments/',
+        json={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': service.id,
+            'start_time': next_business_day_8am,
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {
+        'id': 1,
+        'client_id': user.id,
+        'professional_id': professional.id,
+        'service_id': service.id,
+        'start_time': next_business_day_8am,
+        'end_time': next_business_day_after_service,
+    }
+
+
+def test_create_appointment_past_date(
+    client,
+    token_admin,
+    user,
+    professional,
+    service,
 ):
     response = client.post(
         '/appointments/',
@@ -220,19 +279,20 @@ def test_admin_create_appointment(
         headers={'Authorization': f'Bearer {token_admin}'},
     )
 
-    assert response.status_code == HTTPStatus.OK
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
     assert response.json() == {
-        'id': 1,
-        'client_id': user.id,
-        'professional_id': professional.id,
-        'service_id': service.id,
-        'start_time': '2001-09-11T08:46:00',
-        'end_time': '2001-09-11T08:56:00',
+        'detail': 'Não é possível fazer um agendamento em datas passadas.'
     }
 
 
 def test_verify_availability_client(  # noqa: PLR0913 PLR0917
-    client, appointment, user, professional, service, token
+    client,
+    appointment,
+    user,
+    professional,
+    service,
+    token,
+    next_business_day_8am,
 ):
     response = client.post(
         '/appointments/',
@@ -240,7 +300,10 @@ def test_verify_availability_client(  # noqa: PLR0913 PLR0917
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:50:00',
+            'start_time': (
+                datetime.fromisoformat(next_business_day_8am)
+                + timedelta(minutes=5)
+            ).isoformat(),
         },
         headers={'Authorization': f'Bearer {token}'},
     )
@@ -252,7 +315,13 @@ def test_verify_availability_client(  # noqa: PLR0913 PLR0917
 
 
 def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
-    client, appointment, other_user, professional, service, token_admin
+    client,
+    appointment,
+    other_user,
+    professional,
+    service,
+    token_admin,
+    next_business_day_8am,
 ):
     response = client.post(
         '/appointments/',
@@ -260,7 +329,10 @@ def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 08:50:00',
+            'start_time': (
+                datetime.fromisoformat(next_business_day_8am)
+                + timedelta(minutes=5)
+            ).isoformat(),
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -271,8 +343,8 @@ def test_verify_availability_professional(  # noqa: PLR0913 PLR0917
     }
 
 
-def test_verify_availability_sunday(
-    client, user, professional, service, token_admin
+def test_verify_availability_sunday(  # noqa: PLR0913 PLR0917
+    client, user, professional, service, token_admin, next_sunday_8am
 ):
     response = client.post(
         '/appointments/',
@@ -280,7 +352,7 @@ def test_verify_availability_sunday(
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '1972-01-30 15:00:00',
+            'start_time': next_sunday_8am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -289,16 +361,19 @@ def test_verify_availability_sunday(
     assert response.json() == {'detail': 'Fora do horário de funcionamento.'}
 
 
-def test_verify_availability_out_of_business_hour(
-    client, user, professional, service, token_admin
+def test_verify_availability_out_of_business_hour(  # noqa: PLR0913 PLR0917
+    client, user, professional, service, token_admin, next_business_day_8am
 ):
+    business_day_10pm = (
+        datetime.fromisoformat(next_business_day_8am) + timedelta(hours=14)
+    ).isoformat()
     response = client.post(
         '/appointments/',
         json={
             'client_id': user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 03:00:00',
+            'start_time': business_day_10pm,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
@@ -467,58 +542,87 @@ def test_update_appointment_forbidden_client(client, other_user, appointment):
     }
 
 
-def test_update_appointment_admin(client, appointment, token_admin):
+def test_update_appointment_admin(
+    client,
+    appointment,
+    token_admin,
+    next_business_day_8am,
+    next_business_day_after_service,
+):
     response = client.patch(
         f'/appointments/{appointment.id}',
-        json={'start_time': '2001-09-11 09:03:00'},
+        json={'start_time': next_business_day_8am},
         headers={'Authorization': f'Bearer {token_admin}'},
     )
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json()['end_time'] == '2001-09-11T09:13:00'
+    assert response.json()['end_time'] == next_business_day_after_service
 
 
 def test_update_appointment_professional(
-    client, appointment, token_professional
+    client,
+    appointment,
+    token_professional,
+    next_business_day_8am,
+    next_business_day_after_service,
 ):
     response = client.patch(
         f'/appointments/{appointment.id}',
-        json={'start_time': '2001-09-11 09:03:00'},
+        json={'start_time': next_business_day_8am},
         headers={'Authorization': f'Bearer {token_professional}'},
     )
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json()['end_time'] == '2001-09-11T09:13:00'
+    assert response.json()['end_time'] == next_business_day_after_service
 
 
-def test_update_appointment_client(client, appointment, token):
+def test_update_appointment_client(
+    client,
+    appointment,
+    token,
+    next_business_day_8am,
+    next_business_day_after_service,
+):
     response = client.patch(
         f'/appointments/{appointment.id}',
-        json={'start_time': '2001-09-11 09:03:00'},
+        json={'start_time': next_business_day_8am},
         headers={'Authorization': f'Bearer {token}'},
     )
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json()['end_time'] == '2001-09-11T09:13:00'
+    assert response.json()['end_time'] == next_business_day_after_service
 
 
 def test_update_appointment_unavailable(  # noqa: PLR0913 PLR0917
-    client, other_user, professional, service, appointment, token_admin
+    client,
+    other_user,
+    professional,
+    service,
+    appointment,
+    token_admin,
+    next_business_day_8am,
 ):
+    business_day_9am = (
+        datetime.fromisoformat(next_business_day_8am) + timedelta(hours=1)
+    ).isoformat()
+    business_day_9_05am = (
+        datetime.fromisoformat(next_business_day_8am)
+        + timedelta(hours=1, minutes=5)
+    ).isoformat()
     client.post(
         '/appointments/',
         json={
             'client_id': other_user.id,
             'professional_id': professional.id,
             'service_id': service.id,
-            'start_time': '2001-09-11 09:03:00',
+            'start_time': business_day_9_05am,
         },
         headers={'Authorization': f'Bearer {token_admin}'},
     )
 
     response = client.patch(
         f'/appointments/{appointment.id}',
-        json={'start_time': '2001-09-11 09:00:00'},
+        json={'start_time': business_day_9am},
         headers={'Authorization': f'Bearer {token_admin}'},
     )
 
@@ -652,9 +756,9 @@ def test_slots_returns_7_days(client, token, professional, service):
 
 
 def test_slots_sunday_unavailable(client, token, professional, service):
-    filter = f'professional_id={professional.id}&service_id={service.id}'
     response = client.get(
-        f'/appointments/slots?{filter}',
+        '/appointments/slots',
+        params={'professional_id': professional.id, 'service_id': service.id},
         headers={'Authorization': f'Bearer {token}'},
     )
 
@@ -670,9 +774,9 @@ def test_slots_sunday_unavailable(client, token, professional, service):
 def test_slots_existing_appointment_blocks_slot(
     client, token, appointment, professional, service
 ):
-    filter = f'professional_id={professional.id}&service_id={service.id}'
     response = client.get(
-        f'/appointments/slots?{filter}',
+        '/appointments/slots',
+        params={'professional_id': professional.id, 'service_id': service.id},
         headers={'Authorization': f'Bearer {token}'},
     )
 
@@ -684,7 +788,7 @@ def test_slots_existing_appointment_blocks_slot(
             appointment_day = day
 
     for slot in appointment_day['slots']:
-        if slot['start_time'] == appointment.start_time:
+        if slot['start_time'] == appointment.start_time.isoformat():
             appointment_slot = slot
 
     assert response.status_code == HTTPStatus.OK
@@ -713,3 +817,48 @@ def test_slots_as_admin(client, token_admin, user, professional, service):
     )
 
     assert response.status_code == HTTPStatus.OK
+
+
+def test_slots_client_not_found(client, token_admin, professional, service):
+    response = client.get(
+        '/appointments/slots',
+        params={
+            'client_id': 67,
+            'professional_id': professional.id,
+            'service_id': service.id,
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'Cliente não encontrado.'}
+
+
+def test_slots_professional_not_found(client, token_admin, user, service):
+    response = client.get(
+        '/appointments/slots',
+        params={
+            'client_id': user.id,
+            'professional_id': 67,
+            'service_id': service.id,
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'Profissional não encontrado.'}
+
+
+def test_slots_service(client, token_admin, user, professional):
+    response = client.get(
+        '/appointments/slots',
+        params={
+            'client_id': user.id,
+            'professional_id': professional.id,
+            'service_id': 67,
+        },
+        headers={'Authorization': f'Bearer {token_admin}'},
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json() == {'detail': 'Serviço não encontrado.'}
