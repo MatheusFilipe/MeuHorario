@@ -57,6 +57,29 @@ function App() {
   const [usersList, setUsersList] = useState([]);
   const [isLoadingUsersList, setIsLoadingUsersList] = useState(false);
 
+  // --- ESTADOS DE CRIAÇÃO DE PROFISSIONAL (ADMIN) ---
+  const [newProfFirstName, setNewProfFirstName] = useState('');
+  const [newProfLastName, setNewProfLastName] = useState('');
+  const [newProfEmail, setNewProfEmail] = useState('');
+  const [newProfPassword, setNewProfPassword] = useState('');
+
+
+  // --- ESTADOS DE AGENDAMENTO (FLOW & SELECTION) ---
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedProfessional, setSelectedProfessional] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [schedulingStep, setSchedulingStep] = useState(1); // 1, 2, 3, 4
+  const [selectionData, setSelectionData] = useState({ clients: [], professionals: [] });
+  const [isLoadingSelection, setIsLoadingSelection] = useState(false);
+  const [slotsDays, setSlotsDays] = useState([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // --- ESTADOS DE EXIBIÇÃO DE AGENDAMENTOS ---
+  const [userAppointments, setUserAppointments] = useState([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+
   // --- ESTADOS DE ERRO E CARREGAMENTO DAS APIS ---
   const [apiError, setApiError] = useState('');
   const [apiSuccess, setApiSuccess] = useState('');
@@ -195,14 +218,144 @@ function App() {
 
   // Trata clique no menu "Agendar"
   const handleSchedulingClick = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setMobileMenuOpen(false);
     if (!token) {
       // Se não logado, abre login modal
       setActiveModal('login');
     } else {
-      // Se logado, abre modal informativa
-      setActiveModal('scheduling_info');
+      // Reseta estados de agendamento e inicia o fluxo interativo
+      setSelectedService(null);
+      setSelectedProfessional(null);
+      setSelectedClient(null);
+      setSchedulingStep(1);
+      setSelectedDay(null);
+      setSelectedSlot(null);
+      setSlotsDays([]);
+      setApiError('');
+      setApiSuccess('');
+      setActiveModal('scheduling');
+      
+      // Carrega dados iniciais do backend
+      loadServices();
+      loadSelectionData();
+    }
+  };
+
+  // Carrega profissionais e clientes disponíveis dependendo do papel do usuário
+  const loadSelectionData = async () => {
+    setIsLoadingSelection(true);
+    try {
+      const data = await api.fetchAppointmentsSelection(token);
+      setSelectionData(data);
+    } catch (err) {
+      console.error('Erro ao carregar seleção:', err);
+      setApiError('Não foi possível obter a lista de profissionais/clientes.');
+    } finally {
+      setIsLoadingSelection(false);
+    }
+  };
+
+  // Carrega horários disponíveis de acordo com o serviço e profissionais selecionados
+  const loadSlots = async (service, professional, client) => {
+    setIsLoadingSlots(true);
+    setApiError('');
+    try {
+      const service_id = service?.id;
+      const professional_id = professional?.id || (currentUser.role === 'professional' ? currentUser.id : null);
+      const client_id = client?.id || (currentUser.role === 'client' ? currentUser.id : null);
+
+      const data = await api.fetchAppointmentSlots({
+        service_id,
+        client_id,
+        professional_id
+      }, token);
+      
+      setSlotsDays(data.days || []);
+      if (data.days && data.days.length > 0) {
+        setSelectedDay(data.days[0]);
+      } else {
+        setSelectedDay(null);
+      }
+      setSelectedSlot(null);
+    } catch (err) {
+      console.error('Erro ao carregar slots:', err);
+      setApiError(err.message || 'Erro ao carregar horários disponíveis.');
+    } finally {
+      setIsLoadingSlots(false);
+    }
+  };
+
+  // Carrega os agendamentos existentes do usuário logado
+  const loadAppointments = async () => {
+    setIsLoadingAppointments(true);
+    setApiError('');
+    try {
+      const data = await api.fetchAppointments(token);
+      setUserAppointments(data.appointments || []);
+    } catch (err) {
+      console.error('Erro ao carregar agendamentos:', err);
+      setApiError('Não foi possível carregar a lista de agendamentos.');
+    } finally {
+      setIsLoadingAppointments(false);
+    }
+  };
+
+  // Abre a visualização de agendamentos e dispara requisições necessárias para o mapeamento
+  const openMyAppointmentsModal = () => {
+    setApiError('');
+    setApiSuccess('');
+    setActiveModal('my_appointments');
+    loadAppointments();
+    loadServices();
+    loadSelectionData();
+    if (currentUser?.role === 'admin') {
+      loadUsers();
+    }
+  };
+
+  // Cria um agendamento novo
+  const handleCreateAppointmentSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setApiError('');
+    setApiSuccess('');
+    setIsSubmitting(true);
+
+    const client_id = selectedClient ? selectedClient.id : currentUser.id;
+    const professional_id = selectedProfessional ? selectedProfessional.id : currentUser.id;
+
+    try {
+      await api.createAppointment({
+        client_id,
+        professional_id,
+        service_id: selectedService.id,
+        start_time: selectedSlot.start_time
+      }, token);
+
+      setApiSuccess('Agendamento realizado com sucesso!');
+      setTimeout(() => {
+        closeModal();
+        openMyAppointmentsModal(); // abre a lista para mostrar o agendamento
+      }, 1200);
+    } catch (err) {
+      setApiError(err.message || 'Erro ao realizar agendamento.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Cancela um agendamento existente
+  const handleCancelAppointment = async (apptId) => {
+    if (!window.confirm('Tem certeza absoluta que deseja cancelar este agendamento?')) return;
+    setApiError('');
+    setApiSuccess('');
+    try {
+      await api.deleteAppointment(apptId, token);
+      setApiSuccess('Agendamento cancelado com sucesso.');
+      loadAppointments();
+      setTimeout(() => setApiSuccess(''), 2000);
+    } catch (err) {
+      setApiError(err.message || 'Erro ao cancelar agendamento.');
     }
   };
 
@@ -386,6 +539,40 @@ function App() {
     }
   };
 
+  const handleCreateProfessionalSubmit = async (e) => {
+    e.preventDefault();
+    setApiError('');
+    setApiSuccess('');
+    setIsSubmitting(true);
+
+    if (!newProfFirstName || !newProfLastName || !newProfEmail || !newProfPassword) {
+      setApiError('Por favor, preencha todos os campos.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      await api.createProfessional({
+        first_name: newProfFirstName,
+        last_name: newProfLastName,
+        email: newProfEmail,
+        password: newProfPassword
+      }, token);
+
+      setApiSuccess('Profissional criado com sucesso!');
+      setNewProfFirstName('');
+      setNewProfLastName('');
+      setNewProfEmail('');
+      setNewProfPassword('');
+      loadUsers();
+      setTimeout(() => setApiSuccess(''), 3000);
+    } catch (err) {
+      setApiError(err.message || 'Erro ao criar profissional.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#121214] text-gray-100 flex flex-col selection:bg-primary selection:text-black">
       
@@ -417,6 +604,16 @@ function App() {
               <Calendar className="w-4 h-4 text-primary" />
               Agendar
             </a>
+            
+            {token && currentUser && (
+              <button 
+                onClick={openMyAppointmentsModal} 
+                className="text-gray-300 hover:text-primary transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Clock className="w-4 h-4 text-primary" />
+                Meus Agendamentos
+              </button>
+            )}
             
             {token && currentUser && currentUser.role === 'admin' && (
               <>
@@ -493,6 +690,16 @@ function App() {
               <Calendar className="w-5 h-5 text-primary" />
               Agendar
             </a>
+
+            {token && currentUser && (
+              <button 
+                onClick={() => { setMobileMenuOpen(false); openMyAppointmentsModal(); }}
+                className="text-left text-lg py-2 border-b border-dark-border/40 text-gray-300 hover:text-primary transition-colors flex items-center gap-2 cursor-pointer w-full"
+              >
+                <Clock className="w-5 h-5 text-primary" />
+                Meus Agendamentos
+              </button>
+            )}
 
             {token && currentUser && currentUser.role === 'admin' && (
               <>
@@ -960,12 +1167,13 @@ function App() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: INFORMAÇÕES DE AGENDAMENTO */}
+      {/* MODAL 3: AGENDAMENTO EM ETAPAS */}
       {/* ========================================================================= */}
-      {activeModal === 'scheduling_info' && (
+      {activeModal === 'scheduling' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 relative shadow-2xl animate-scaleIn text-center">
+          <div className="w-full max-w-2xl bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 relative shadow-2xl animate-scaleIn max-h-[90vh] overflow-y-auto">
             
+            {/* Fechar botão */}
             <button 
               onClick={closeModal}
               className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#121214] border border-dark-border"
@@ -973,34 +1181,465 @@ function App() {
               <X className="w-5 h-5" />
             </button>
 
-            <div className="w-16 h-16 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-              <Calendar className="w-8 h-8 text-primary" />
+            {/* Cabeçalho do Modal */}
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Calendar className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="font-serif text-xl font-bold text-white">Agendar Novo Horário</h3>
+              <p className="text-xs text-gray-400 mt-1">Siga as etapas abaixo para reservar seu atendimento</p>
             </div>
 
-            <h3 className="font-serif text-2xl font-bold text-white mb-2">Agendamentos Online</h3>
+            {/* Indicador de Progresso (Steps) */}
+            <div className="flex items-center justify-between mb-8 max-w-md mx-auto">
+              {[
+                { step: 1, label: 'Serviço' },
+                { step: 2, label: currentUser?.role === 'client' ? 'Profissional' : currentUser?.role === 'professional' ? 'Cliente' : 'Seleção' },
+                { step: 3, label: 'Data e Hora' },
+                { step: 4, label: 'Confirmar' }
+              ].map((item, idx) => (
+                <div key={item.step} className="flex items-center flex-1 last:flex-initial">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border transition-all duration-300 ${
+                      schedulingStep === item.step 
+                        ? 'bg-primary text-black border-primary font-bold shadow-md shadow-primary/20' 
+                        : schedulingStep > item.step 
+                          ? 'bg-emerald-950/50 border-emerald-500 text-emerald-400' 
+                          : 'bg-dark-card border-dark-border text-gray-500'
+                    }`}>
+                      {item.step}
+                    </div>
+                    <span className={`text-[9px] font-sans tracking-wide mt-1.5 hidden sm:block ${
+                      schedulingStep === item.step 
+                        ? 'text-primary font-semibold' 
+                        : schedulingStep > item.step 
+                          ? 'text-emerald-400' 
+                          : 'text-gray-500'
+                    }`}>
+                      {item.label}
+                    </span>
+                  </div>
+                  {idx < 3 && (
+                    <div className={`h-[2px] flex-1 mx-2 -mt-4 sm:-mt-5 transition-colors duration-300 ${
+                      schedulingStep > item.step ? 'bg-emerald-500' : 'bg-dark-border'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Notificações de Erro / Sucesso no Agendamento */}
+            {apiError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-950/40 border border-red-900/30 text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiError}</span>
+              </div>
+            )}
+            {apiSuccess && (
+              <div className="mb-4 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/30 text-emerald-400 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiSuccess}</span>
+              </div>
+            )}
+
+            {/* CONTEÚDO DAS ETAPAS */}
             
-            <div className="h-0.5 w-12 bg-primary mx-auto my-3 rounded-full"></div>
+            {/* ETAPA 1: SELEÇÃO DE SERVIÇO */}
+            {schedulingStep === 1 && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-300 font-light text-center mb-2">Selecione o serviço que deseja agendar:</p>
+                {isLoadingServices ? (
+                  <p className="text-xs text-gray-500 text-center py-8">Carregando serviços...</p>
+                ) : services.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-8">Nenhum serviço disponível no momento.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {services.map((svc) => (
+                      <button
+                        key={svc.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedService(svc);
+                          setSchedulingStep(2);
+                        }}
+                        className={`flex flex-col text-left p-4 rounded-xl border transition-all cursor-pointer ${
+                          selectedService?.id === svc.id
+                            ? 'border-primary bg-primary/5 shadow-md shadow-primary/5'
+                            : 'border-dark-border hover:border-gray-500 bg-[#121214] hover:-translate-y-0.5'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start w-full">
+                          <span className="font-bold text-gray-100 text-sm truncate max-w-[70%]">{svc.name}</span>
+                          <span className="font-serif text-xs font-bold text-primary shrink-0">R$ {svc.price.toFixed(2)}</span>
+                        </div>
+                        <span className="text-[11px] text-gray-400 mt-3 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-primary" /> {svc.duration} minutos
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-            <p className="text-sm text-gray-300 leading-relaxed font-light mb-6">
-              Olá, <strong className="text-primary">{currentUser?.first_name}</strong>! <br />
-              Atualmente estamos integrando nossa plataforma de agendamento online.
-            </p>
+            {/* ETAPA 2: SELEÇÃO DE PROFISSIONAL OU CLIENTE */}
+            {schedulingStep === 2 && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-300 font-light text-center mb-2">
+                  {currentUser?.role === 'client' 
+                    ? 'Escolha um profissional para realizar o serviço:' 
+                    : currentUser?.role === 'professional' 
+                      ? 'Selecione o cliente atendido neste horário:' 
+                      : 'Selecione o cliente e o profissional:'}
+                </p>
 
-            <div className="p-4 bg-[#121214] border border-dark-border rounded-xl mb-6 text-xs text-left text-gray-400 space-y-2">
-              <p className="font-semibold text-gray-300">Próximos passos do projeto:</p>
-              <ul className="list-disc list-inside space-y-1.5">
-                <li>Integração com a rota <code className="text-xs bg-dark-card px-1 py-0.5 text-primary">GET /services/</code> para listar serviços</li>
-                <li>Integração com <code className="text-xs bg-dark-card px-1 py-0.5 text-primary">POST /appointments/</code> para marcar o horário</li>
-                <li>Confirmação e exibição dos agendamentos marcados</li>
-              </ul>
-            </div>
+                {isLoadingSelection ? (
+                  <p className="text-xs text-gray-500 text-center py-8">Carregando usuários...</p>
+                ) : (
+                  <div className="space-y-4">
+                    {/* CLIENTE ESCOLHE PROFISSIONAL */}
+                    {currentUser?.role === 'client' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectionData.professionals.length === 0 ? (
+                          <p className="text-xs text-gray-500 text-center py-4 col-span-2">Nenhum barbeiro/profissional encontrado.</p>
+                        ) : (
+                          selectionData.professionals.map((prof) => (
+                            <button
+                              key={prof.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedProfessional(prof);
+                                loadSlots(selectedService, prof, currentUser);
+                                setSchedulingStep(3);
+                              }}
+                              className={`flex items-center gap-3.5 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                                selectedProfessional?.id === prof.id
+                                  ? 'border-primary bg-primary/5 shadow-md shadow-primary/5'
+                                  : 'border-dark-border hover:border-gray-500 bg-[#121214] hover:-translate-y-0.5'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-dark-card border border-primary/20 flex items-center justify-center font-bold text-primary text-sm font-serif">
+                                {prof.first_name[0]}{prof.last_name[0]}
+                              </div>
+                              <div className="truncate">
+                                <p className="font-semibold text-sm text-gray-100 truncate">{prof.first_name} {prof.last_name}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{prof.email}</p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
 
-            <button 
-              onClick={closeModal}
-              className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-black font-bold text-sm transition-colors cursor-pointer"
-            >
-              Entendido, aguardo novidades!
-            </button>
+                    {/* PROFISSIONAL ESCOLHE CLIENTE */}
+                    {currentUser?.role === 'professional' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {selectionData.clients.length === 0 ? (
+                          <p className="text-xs text-gray-500 text-center py-4 col-span-2">Nenhum cliente cadastrado.</p>
+                        ) : (
+                          selectionData.clients.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedClient(c);
+                                loadSlots(selectedService, currentUser, c);
+                                setSchedulingStep(3);
+                              }}
+                              className={`flex items-center gap-3.5 p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                                selectedClient?.id === c.id
+                                  ? 'border-primary bg-primary/5 shadow-md'
+                                  : 'border-dark-border hover:border-gray-500 bg-[#121214] hover:-translate-y-0.5'
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-dark-card border border-primary/20 flex items-center justify-center font-bold text-primary text-sm font-serif">
+                                {c.first_name[0]}{c.last_name[0]}
+                              </div>
+                              <div className="truncate">
+                                <p className="font-semibold text-sm text-gray-100 truncate">{c.first_name} {c.last_name}</p>
+                                <p className="text-[10px] text-gray-400 truncate">{c.email}</p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* ADMIN ESCOLHE CLIENTE E PROFISSIONAL */}
+                    {currentUser?.role === 'admin' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        {/* Seção Cliente */}
+                        <div className="space-y-2">
+                          <p className="text-[11px] uppercase tracking-widest font-bold text-primary">1. Selecionar Cliente</p>
+                          {selectionData.clients.length === 0 ? (
+                            <p className="text-xs text-gray-500 py-4">Sem clientes cadastrados.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 border border-dark-border/40 p-2 rounded-xl bg-[#121214]">
+                              {selectionData.clients.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setSelectedClient(c)}
+                                  className={`flex items-center gap-2.5 p-2 rounded-lg border text-left w-full transition-all cursor-pointer ${
+                                    selectedClient?.id === c.id
+                                      ? 'border-primary bg-primary/10'
+                                      : 'border-dark-border hover:border-gray-600 bg-dark-card'
+                                  }`}
+                                >
+                                  <div className="w-7 h-7 rounded-full bg-dark-card border border-primary/10 flex items-center justify-center font-bold text-primary text-[10px]">
+                                    {c.first_name[0]}{c.last_name[0]}
+                                  </div>
+                                  <div className="truncate">
+                                    <p className="font-semibold text-xs text-gray-100 truncate">{c.first_name} {c.last_name}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Seção Profissional */}
+                        <div className="space-y-2">
+                          <p className="text-[11px] uppercase tracking-widest font-bold text-primary">2. Selecionar Profissional</p>
+                          {selectionData.professionals.length === 0 ? (
+                            <p className="text-xs text-gray-500 py-4">Sem profissionais cadastrados.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 border border-dark-border/40 p-2 rounded-xl bg-[#121214]">
+                              {selectionData.professionals.map((prof) => (
+                                <button
+                                  key={prof.id}
+                                  type="button"
+                                  onClick={() => setSelectedProfessional(prof)}
+                                  className={`flex items-center gap-2.5 p-2 rounded-lg border text-left w-full transition-all cursor-pointer ${
+                                    selectedProfessional?.id === prof.id
+                                      ? 'border-primary bg-primary/10'
+                                      : 'border-dark-border hover:border-gray-600 bg-dark-card'
+                                  }`}
+                                >
+                                  <div className="w-7 h-7 rounded-full bg-dark-card border border-primary/10 flex items-center justify-center font-bold text-primary text-[10px]">
+                                    {prof.first_name[0]}{prof.last_name[0]}
+                                  </div>
+                                  <div className="truncate">
+                                    <p className="font-semibold text-xs text-gray-100 truncate">{prof.first_name} {prof.last_name}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-4 border-t border-dark-border/40 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setSchedulingStep(1)}
+                    className="px-5 py-2.5 text-xs border border-dark-border rounded-xl text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  {currentUser?.role === 'admin' && (
+                    <button
+                      type="button"
+                      disabled={!selectedClient || !selectedProfessional}
+                      onClick={() => {
+                        loadSlots(selectedService, selectedProfessional, selectedClient);
+                        setSchedulingStep(3);
+                      }}
+                      className="px-6 py-2.5 text-xs bg-primary hover:bg-primary-hover disabled:bg-primary/40 disabled:text-gray-500 text-black font-semibold rounded-xl cursor-pointer"
+                    >
+                      Avançar
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 3: SELEÇÃO DE SLOTS DE DATA E HORÁRIO */}
+            {schedulingStep === 3 && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-300 font-light text-center mb-2">Selecione o dia e horário para o atendimento:</p>
+                
+                {isLoadingSlots ? (
+                  <p className="text-xs text-gray-500 text-center py-12">Consultando slots livres na agenda...</p>
+                ) : slotsDays.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-12 text-red-400">Não há horários de atendimento configurados ou disponíveis.</p>
+                ) : (
+                  <div className="space-y-5">
+                    {/* Linha horizontal com os dias */}
+                    <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-thin">
+                      {slotsDays.map((day) => {
+                        const dateObj = new Date(day.date + 'T00:00:00');
+                        const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
+                        const dayMonth = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                        const isSelected = selectedDay?.date === day.date;
+                        
+                        return (
+                          <button
+                            key={day.date}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDay(day);
+                              setSelectedSlot(null);
+                            }}
+                            className={`flex flex-col items-center justify-center min-w-[72px] p-2.5 rounded-xl border text-center transition-all cursor-pointer shrink-0 ${
+                              isSelected
+                                ? 'border-primary bg-primary text-black font-bold shadow-md shadow-primary/10'
+                                : 'border-dark-border hover:border-gray-500 bg-[#121214]'
+                            }`}
+                          >
+                            <span className={`text-[9px] uppercase tracking-widest font-semibold ${isSelected ? 'text-black/85' : 'text-gray-400'}`}>
+                              {weekday.replace('.', '')}
+                            </span>
+                            <span className="text-sm font-serif mt-0.5">{dayMonth}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Exibição dos slots para o dia selecionado */}
+                    {selectedDay && (
+                      <div className="space-y-3">
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                          Slots disponíveis para o dia {new Date(selectedDay.date + 'T00:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', weekday: 'long' })}:
+                        </p>
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-56 overflow-y-auto pr-1 border border-dark-border/40 p-3 rounded-xl bg-[#121214]">
+                          {selectedDay.slots.map((slot) => {
+                            const timeString = slot.start_time.split('T')[1].substring(0, 5);
+                            const isSelected = selectedSlot?.start_time === slot.start_time;
+                            const isAvailable = slot.available;
+                            
+                            return (
+                              <button
+                                key={slot.start_time}
+                                type="button"
+                                disabled={!isAvailable}
+                                onClick={() => setSelectedSlot(slot)}
+                                className={`py-2 text-xs font-bold rounded-lg border text-center transition-all ${
+                                  isSelected
+                                    ? 'border-primary bg-primary text-black cursor-pointer'
+                                    : isAvailable
+                                      ? 'border-dark-border hover:border-primary/50 text-gray-200 bg-dark-card hover:bg-dark-card/60 cursor-pointer'
+                                      : 'border-dark-border/10 text-gray-600 bg-dark-card/10 line-through opacity-30 cursor-not-allowed'
+                                }`}
+                              >
+                                {timeString}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-4 border-t border-dark-border/40 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setSchedulingStep(2)}
+                    className="px-5 py-2.5 text-xs border border-dark-border rounded-xl text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!selectedSlot}
+                    onClick={() => setSchedulingStep(4)}
+                    className="px-6 py-2.5 text-xs bg-primary hover:bg-primary-hover disabled:bg-primary/40 disabled:text-gray-500 text-black font-semibold rounded-xl cursor-pointer"
+                  >
+                    Avançar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 4: CONFIRMAÇÃO DO AGENDAMENTO */}
+            {schedulingStep === 4 && (
+              <div className="space-y-5">
+                <p className="text-sm text-gray-300 font-light text-center">Revise as informações antes de confirmar sua reserva:</p>
+                
+                <div className="bg-[#121214] border border-dark-border rounded-2xl p-5 space-y-4">
+                  {/* Linha 1: Serviço e Preço */}
+                  <div className="flex justify-between items-start pb-3 border-b border-dark-border/40">
+                    <div>
+                      <p className="text-[9px] uppercase tracking-wider text-gray-400">Serviço</p>
+                      <p className="font-bold text-sm text-gray-200">{selectedService?.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{selectedService?.duration} minutos de duração</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] uppercase tracking-wider text-gray-400">Preço</p>
+                      <p className="font-serif font-bold text-primary text-base">R$ {selectedService?.price.toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  {/* Linha 2: Profissionais / Clientes dependendo do papel */}
+                  {currentUser?.role === 'client' && selectedProfessional && (
+                    <div className="pb-3 border-b border-dark-border/40">
+                      <p className="text-[9px] uppercase tracking-wider text-gray-400">Profissional / Barbeiro</p>
+                      <p className="font-semibold text-sm text-gray-200 mt-0.5">{selectedProfessional.first_name} {selectedProfessional.last_name}</p>
+                      <p className="text-xs text-gray-400">{selectedProfessional.email}</p>
+                    </div>
+                  )}
+
+                  {currentUser?.role === 'professional' && selectedClient && (
+                    <div className="pb-3 border-b border-dark-border/40">
+                      <p className="text-[9px] uppercase tracking-wider text-gray-400">Cliente Agendado</p>
+                      <p className="font-semibold text-sm text-gray-200 mt-0.5">{selectedClient.first_name} {selectedClient.last_name}</p>
+                      <p className="text-xs text-gray-400">{selectedClient.email}</p>
+                    </div>
+                  )}
+
+                  {currentUser?.role === 'admin' && (
+                    <div className="grid grid-cols-2 gap-4 pb-3 border-b border-dark-border/40">
+                      <div>
+                        <p className="text-[9px] uppercase tracking-wider text-gray-400">Cliente</p>
+                        <p className="font-semibold text-xs text-gray-200 mt-0.5">{selectedClient?.first_name} {selectedClient?.last_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] uppercase tracking-wider text-gray-400">Profissional</p>
+                        <p className="font-semibold text-xs text-gray-200 mt-0.5">{selectedProfessional?.first_name} {selectedProfessional?.last_name}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Linha 3: Horário selecionado */}
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-gray-400">Data e Horário</p>
+                    <p className="font-bold text-sm text-primary flex items-center gap-1.5 mt-1">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      {selectedSlot && (() => {
+                        const dateObj = new Date(selectedSlot.start_time);
+                        const weekdayStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+                        const dateStr = dateObj.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+                        const timeStr = selectedSlot.start_time.split('T')[1].substring(0, 5);
+                        return `${weekdayStr}, ${dateStr} às ${timeStr}`;
+                      })()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-dark-border/40 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setSchedulingStep(3)}
+                    className="px-5 py-2.5 text-xs border border-dark-border rounded-xl text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleCreateAppointmentSubmit}
+                    className="px-8 py-3 bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-black font-bold text-xs rounded-xl cursor-pointer flex items-center gap-2 shadow-lg shadow-primary/10"
+                  >
+                    {isSubmitting ? 'Confirmando...' : 'Confirmar Reserva'}
+                    {!isSubmitting && <CheckCircle2 className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -1310,6 +1949,139 @@ function App() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 7: MEUS AGENDAMENTOS */}
+      {/* ========================================================================= */}
+      {activeModal === 'my_appointments' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-2xl bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 relative shadow-2xl animate-scaleIn max-h-[90vh] overflow-y-auto">
+            
+            {/* Fechar botão */}
+            <button 
+              onClick={closeModal}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#121214] border border-dark-border"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Cabeçalho do Modal */}
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Clock className="w-5 h-5 text-primary" />
+              </div>
+              <h3 className="font-serif text-xl font-bold text-white">Meus Agendamentos</h3>
+              <p className="text-xs text-gray-400 mt-1">Visualize seus atendimentos futuros ou cancele reservas</p>
+            </div>
+
+            {/* Mensagens de Sucesso / Erro */}
+            {apiError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-950/40 border border-red-900/30 text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiError}</span>
+              </div>
+            )}
+            {apiSuccess && (
+              <div className="mb-4 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/30 text-emerald-400 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiSuccess}</span>
+              </div>
+            )}
+
+            {/* LISTA DE AGENDAMENTOS */}
+            <div>
+              {isLoadingAppointments ? (
+                <p className="text-xs text-gray-500 text-center py-8">Carregando seus agendamentos...</p>
+              ) : userAppointments.length === 0 ? (
+                <div className="text-center py-10 space-y-4">
+                  <p className="text-sm text-gray-400 font-light">Você não possui nenhum agendamento marcado no momento.</p>
+                  <button
+                    onClick={() => {
+                      closeModal();
+                      handleSchedulingClick();
+                    }}
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-black font-semibold text-xs rounded-xl cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Agendar Horário
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {userAppointments.map((appt) => {
+                    const service = services.find(s => s.id === appt.service_id);
+                    const serviceName = service ? service.name : `Serviço #${appt.service_id}`;
+                    const priceText = service ? `R$ ${service.price.toFixed(2)}` : '';
+                    
+                    let userDetailText = '';
+                    if (currentUser.role === 'client') {
+                      const prof = selectionData.professionals.find(p => p.id === appt.professional_id) || usersList.find(u => u.id === appt.professional_id);
+                      userDetailText = prof ? `Barbeiro: ${prof.first_name} ${prof.last_name}` : `Profissional #${appt.professional_id}`;
+                    } else if (currentUser.role === 'professional') {
+                      const client = selectionData.clients.find(c => c.id === appt.client_id) || usersList.find(u => u.id === appt.client_id);
+                      userDetailText = client ? `Cliente: ${client.first_name} ${client.last_name}` : `Cliente #${appt.client_id}`;
+                    } else if (currentUser.role === 'admin') {
+                      const prof = selectionData.professionals.find(p => p.id === appt.professional_id) || usersList.find(u => u.id === appt.professional_id);
+                      const client = selectionData.clients.find(c => c.id === appt.client_id) || usersList.find(u => u.id === appt.client_id);
+                      const profName = prof ? `${prof.first_name} ${prof.last_name}` : `#${appt.professional_id}`;
+                      const clientName = client ? `${client.first_name} ${client.last_name}` : `#${appt.client_id}`;
+                      userDetailText = `Cliente: ${clientName} | Barbeiro: ${profName}`;
+                    }
+
+                    const startDtObj = new Date(appt.start_time);
+                    const isPast = startDtObj < new Date();
+                    
+                    const dateFormatted = startDtObj.toLocaleDateString('pt-BR', {
+                      weekday: 'short',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric'
+                    });
+                    const timeFormatted = appt.start_time.split('T')[1].substring(0, 5);
+
+                    return (
+                      <div 
+                        key={appt.id} 
+                        className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border rounded-xl bg-[#121214] transition-all hover:border-dark-border ${
+                          isPast ? 'border-dark-border/30 opacity-60' : 'border-dark-border hover:shadow-md'
+                        }`}
+                      >
+                        <div className="space-y-1 truncate max-w-[70%]">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-gray-100">{serviceName}</span>
+                            {priceText && (
+                              <span className="font-serif text-xs text-primary font-semibold">{priceText}</span>
+                            )}
+                            {isPast && (
+                              <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-gray-800 text-gray-500 font-bold border border-gray-700">Passado</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400">{userDetailText}</p>
+                          <p className="text-xs text-primary flex items-center gap-1 font-semibold pt-0.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {dateFormatted} às {timeFormatted}
+                          </p>
+                        </div>
+                        
+                        {!isPast && (
+                          <div className="mt-3 sm:mt-0">
+                            <button
+                              onClick={() => handleCancelAppointment(appt.id)}
+                              className="px-3 py-1.5 text-[10px] bg-red-950/20 hover:bg-red-900/40 text-red-400 hover:text-red-200 border border-red-900/30 rounded-md cursor-pointer transition-colors"
+                            >
+                              Cancelar Reserva
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

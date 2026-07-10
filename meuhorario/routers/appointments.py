@@ -261,6 +261,79 @@ async def get_appointments(
     return {'appointments': appointments}
 
 
+@router.get(
+    '/slots',
+    status_code=HTTPStatus.OK,
+    response_model=WeekSlotsResponse,
+)
+async def get_appointments_grade(
+    session: Session, filter: AppointmentFilter, user: CurrentUser
+):
+    client_id = filter.client_id
+    professional_id = filter.professional_id
+    if user.role == UserRole.client:
+        client_id = user.id
+    elif user.role == UserRole.professional:
+        professional_id = user.id
+    elif user.role == UserRole.admin:
+        pass
+
+    client = await session.scalar(select(User).where(User.id == client_id))
+    if not client:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Cliente não encontrado.'
+        )
+    professional = await session.scalar(
+        select(User).where(User.id == professional_id)
+    )
+    if not professional:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail='Profissional não encontrado.',
+        )
+    service = await session.scalar(
+        select(Service).where(Service.id == filter.service_id)
+    )
+    if not service:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Serviço não encontrado.'
+        )
+
+    start_time = time(8, 0)
+    end_time = time(18, 0)
+    start_of_week = date.today()
+    end_of_week = start_of_week + timedelta(days=6)
+
+    week_slots = []
+    day = start_of_week
+    while day <= end_of_week:
+        day_slots = []
+        current_dt = datetime.combine(day, start_time)
+        end_dt = datetime.combine(day, end_time)
+        while current_dt < end_dt:
+            available = (
+                True
+                if await verify_availability(
+                    session,
+                    client,
+                    professional,
+                    current_dt,
+                    current_dt + timedelta(minutes=service.duration),
+                )
+                is None
+                else False
+            )
+            day_slots.append({
+                'start_time': current_dt,
+                'available': available,
+            })
+            current_dt += timedelta(minutes=15)
+        week_slots.append({'date': day, 'slots': day_slots})
+        day += timedelta(days=1)
+
+    return {'days': week_slots}
+
+
 @router.patch(
     '/{appointment_id}',
     status_code=HTTPStatus.OK,
@@ -365,74 +438,4 @@ async def delete_appointment(
     return {'message': 'Agendamento deletado.'}
 
 
-@router.get(
-    '/slots',
-    status_code=HTTPStatus.OK,
-    response_model=WeekSlotsResponse,
-)
-async def get_appointments_grade(
-    session: Session, filter: AppointmentFilter, user: CurrentUser
-):
-    client_id = filter.client_id
-    professional_id = filter.professional_id
-    if user.role == UserRole.client:
-        client_id = user.id
-    elif user.role == UserRole.professional:
-        professional_id = user.id
-    elif user.role == UserRole.admin:
-        pass
 
-    client = await session.scalar(select(User).where(User.id == client_id))
-    if not client:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='Cliente não encontrado.'
-        )
-    professional = await session.scalar(
-        select(User).where(User.id == professional_id)
-    )
-    if not professional:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail='Profissional não encontrado.',
-        )
-    service = await session.scalar(
-        select(Service).where(Service.id == filter.service_id)
-    )
-    if not service:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='Serviço não encontrado.'
-        )
-
-    start_time = time(8, 0)
-    end_time = time(18, 0)
-    start_of_week = date.today()
-    end_of_week = start_of_week + timedelta(days=6)
-
-    week_slots = []
-    day = start_of_week
-    while day <= end_of_week:
-        day_slots = []
-        current_dt = datetime.combine(day, start_time)
-        end_dt = datetime.combine(day, end_time)
-        while current_dt < end_dt:
-            available = (
-                True
-                if await verify_availability(
-                    session,
-                    client,
-                    professional,
-                    current_dt,
-                    current_dt + timedelta(minutes=service.duration),
-                )
-                is None
-                else False
-            )
-            day_slots.append({
-                'start_time': current_dt,
-                'available': available,
-            })
-            current_dt += timedelta(minutes=15)
-        week_slots.append({'date': day, 'slots': day_slots})
-        day += timedelta(days=1)
-
-    return {'days': week_slots}

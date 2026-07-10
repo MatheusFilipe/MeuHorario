@@ -849,7 +849,7 @@ def test_slots_professional_not_found(client, token_admin, user, service):
     assert response.json() == {'detail': 'Profissional não encontrado.'}
 
 
-def test_slots_service(client, token_admin, user, professional):
+def test_slots_service_not_found(client, token_admin, user, professional):
     response = client.get(
         '/appointments/slots',
         params={

@@ -103,6 +103,40 @@ export async function registerUser({ first_name, last_name, email, password }) {
 }
 
 /**
+ * 2b. CRIAR CONTA DE PROFISSIONAL (POST /users/professional) - Apenas Admin
+ */
+export async function createProfessional({ first_name, last_name, email, password }, token) {
+  const url = `${API_BASE_URL}/users/professional`;
+
+  const bodyData = {
+    first_name,
+    last_name,
+    email,
+    password
+  };
+
+  console.log(`[API] Criando profissional em: ${url}`, { ...bodyData, password: '***' });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify(bodyData)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao criar profissional.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+
+/**
  * 3. BUSCAR TODOS OS USUÁRIOS (GET /users/)
  * 
  * Usamos esta rota para listar usuários. Não exige permissão no backend,
@@ -323,6 +357,144 @@ export async function deleteService(serviceId, token) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const message = errorData.detail || 'Falha ao deletar serviço.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 11. BUSCAR SELEÇÃO DE CLIENTES E PROFISSIONAIS PARA AGENDAMENTO (GET /appointments/selection)
+ */
+export async function fetchAppointmentsSelection(token) {
+  const url = `${API_BASE_URL}/appointments/selection`;
+
+  console.log(`[API] Buscando seleção de usuários em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao obter lista de seleção para agendamento.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 12. BUSCAR GRADE DE HORÁRIOS / SLOTS DISPONÍVEIS (GET /appointments/slots)
+ */
+export async function fetchAppointmentSlots({ service_id, client_id, professional_id }, token) {
+  const params = new URLSearchParams();
+  if (service_id) params.append('service_id', service_id);
+  if (client_id) params.append('client_id', client_id);
+  if (professional_id) params.append('professional_id', professional_id);
+
+  const url = `${API_BASE_URL}/appointments/slots?${params.toString()}`;
+
+  console.log(`[API] Buscando slots de agendamento em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao obter slots de horário.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 13. CRIAR NOVO AGENDAMENTO (POST /appointments/)
+ */
+export async function createAppointment({ client_id, professional_id, service_id, start_time }, token) {
+  const url = `${API_BASE_URL}/appointments/`;
+
+  const bodyData = {
+    client_id: parseInt(client_id),
+    professional_id: parseInt(professional_id),
+    service_id: parseInt(service_id),
+    start_time: start_time,
+  };
+
+  console.log(`[API] Criando agendamento em: ${url}`, bodyData);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(bodyData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao criar agendamento.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 14. LISTAR AGENDAMENTOS DO USUÁRIO (GET /appointments/)
+ */
+export async function fetchAppointments(token) {
+  const url = `${API_BASE_URL}/appointments/?limit=100`;
+
+  console.log(`[API] Buscando agendamentos em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao obter lista de agendamentos.';
+    throw new Error(message);
+  }
+
+  return await response.json();
+}
+
+/**
+ * 15. CANCELAR AGENDAMENTO (DELETE /appointments/{id})
+ */
+export async function deleteAppointment(appointmentId, token) {
+  const url = `${API_BASE_URL}/appointments/${appointmentId}`;
+
+  console.log(`[API] Cancelando agendamento ${appointmentId} em: ${url}`);
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.detail || 'Falha ao cancelar agendamento.';
     throw new Error(message);
   }
 
