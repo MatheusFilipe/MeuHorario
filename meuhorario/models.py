@@ -13,9 +13,6 @@ class UserRole(str, Enum):
     admin = 'admin'
 
 
-class AppointmentState(str, Enum): ...
-
-
 @table_registry.mapped_as_dataclass
 class Appointment:
     __tablename__ = 'appointments'
@@ -63,12 +60,14 @@ class User:
         foreign_keys=[Appointment.client_id],
         back_populates='client',
         lazy='selectin',
+        cascade='all, delete-orphan',
     )
     professional_appointments: Mapped[list['Appointment']] = relationship(
         init=False,
         foreign_keys=[Appointment.professional_id],
         back_populates='professional',
         lazy='selectin',
+        cascade='all, delete-orphan',
     )
 
 

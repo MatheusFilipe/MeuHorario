@@ -436,6 +436,3 @@ async def delete_appointment(
     await session.commit()
 
     return {'message': 'Agendamento deletado.'}
-
-
-

@@ -56,6 +56,7 @@ function App() {
   // --- ESTADOS DE GERENCIAMENTO DE USUÁRIOS ---
   const [usersList, setUsersList] = useState([]);
   const [isLoadingUsersList, setIsLoadingUsersList] = useState(false);
+  const [manageUsersTab, setManageUsersTab] = useState('list'); // 'list' ou 'create'
 
   // --- ESTADOS DE CRIAÇÃO DE PROFISSIONAL (ADMIN) ---
   const [newProfFirstName, setNewProfFirstName] = useState('');
@@ -521,6 +522,7 @@ function App() {
   const openManageUsersModal = () => {
     setApiError('');
     setApiSuccess('');
+    setManageUsersTab('list');
     setActiveModal('manage_users');
     loadUsers();
   };
@@ -886,16 +888,12 @@ function App() {
                 </h3>
                 <ul className="space-y-4">
                   <li className="flex justify-between items-center pb-2 border-b border-dark-border/40">
-                    <span className="text-sm font-medium text-gray-300">Segunda-feira</span>
-                    <span className="text-sm text-primary font-bold">09:00 - 20:00</span>
-                  </li>
-                  <li className="flex justify-between items-center pb-2 border-b border-dark-border/40">
-                    <span className="text-sm font-medium text-gray-300">Terça a Sexta</span>
-                    <span className="text-sm text-primary font-bold">09:00 - 20:00</span>
+                    <span className="text-sm font-medium text-gray-300">Segunda a Sexta</span>
+                    <span className="text-sm text-primary font-bold">08:00 - 18:00</span>
                   </li>
                   <li className="flex justify-between items-center pb-2 border-b border-dark-border/40">
                     <span className="text-sm font-medium text-gray-300">Sábado</span>
-                    <span className="text-sm text-primary font-bold">08:00 - 18:00</span>
+                    <span className="text-sm text-primary font-bold">08:00 - 16:00</span>
                   </li>
                   <li className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-500">Domingo</span>
@@ -1910,48 +1908,163 @@ function App() {
               <p className="text-xs text-gray-400 mt-1">Visualize e gerencie os usuários registrados na aplicação</p>
             </div>
 
-            {/* LISTA DE USUÁRIOS */}
-            <div>
-              {isLoadingUsersList ? (
-                <p className="text-xs text-gray-500 text-center py-4">Carregando usuários...</p>
-              ) : usersList.length === 0 ? (
-                <p className="text-xs text-gray-500 text-center py-4">Nenhum usuário cadastrado.</p>
-              ) : (
-                <div className="border border-dark-border rounded-xl overflow-hidden divide-y divide-dark-border">
-                  {usersList.map((user) => (
-                    <div key={user.id} className="flex justify-between items-center p-3.5 hover:bg-[#121214] transition-colors">
-                      <div>
-                        <p className="font-semibold text-sm text-gray-100">
-                          {user.first_name} {user.last_name}{' '}
-                          <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full font-sans font-bold uppercase ${
-                            user.role === 'admin' 
-                              ? 'bg-primary/20 text-primary border border-primary/30' 
-                              : user.role === 'professional' 
-                                ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-900/30'
-                                : 'bg-gray-800 text-gray-400 border border-gray-700'
-                          }`}>
-                            {user.role}
-                          </span>
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{user.email}</p>
-                      </div>
-                      <div>
-                        {user.id !== currentUser.id ? (
-                          <button 
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="px-3 py-1.5 text-[10px] bg-red-950/20 hover:bg-red-900/40 text-red-400 hover:text-red-200 border border-red-900/30 rounded-md cursor-pointer transition-colors"
-                          >
-                            Excluir
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-gray-600 italic">Você (Admin)</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Mensagens de Sucesso / Erro */}
+            {apiError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-950/40 border border-red-900/30 text-red-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiError}</span>
+              </div>
+            )}
+            {apiSuccess && (
+              <div className="mb-4 p-3 rounded-lg bg-emerald-950/40 border border-emerald-900/30 text-emerald-400 text-xs flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{apiSuccess}</span>
+              </div>
+            )}
+
+            {/* SELETOR DE ABAS */}
+            <div className="flex gap-2 p-1 bg-[#121214] border border-dark-border rounded-xl mb-6">
+              <button
+                onClick={() => {
+                  setApiError('');
+                  setApiSuccess('');
+                  setManageUsersTab('list');
+                }}
+                className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  manageUsersTab === 'list'
+                    ? 'bg-primary text-black shadow-md'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-card/50'
+                }`}
+              >
+                Lista de Usuários
+              </button>
+              <button
+                onClick={() => {
+                  setApiError('');
+                  setApiSuccess('');
+                  setManageUsersTab('create');
+                }}
+                className={`flex-1 py-2.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  manageUsersTab === 'create'
+                    ? 'bg-primary text-black shadow-md'
+                    : 'text-gray-400 hover:text-white hover:bg-dark-card/50'
+                }`}
+              >
+                Cadastrar Profissional
+              </button>
             </div>
+
+            {manageUsersTab === 'list' ? (
+              /* LISTA DE USUÁRIOS */
+              <div>
+                {isLoadingUsersList ? (
+                  <p className="text-xs text-gray-500 text-center py-4">Carregando usuários...</p>
+                ) : usersList.length === 0 ? (
+                  <p className="text-xs text-gray-500 text-center py-4">Nenhum usuário cadastrado.</p>
+                ) : (
+                  <div className="border border-dark-border rounded-xl overflow-hidden divide-y divide-dark-border">
+                    {usersList.map((user) => (
+                      <div key={user.id} className="flex justify-between items-center p-3.5 hover:bg-[#121214] transition-colors">
+                        <div>
+                          <p className="font-semibold text-sm text-gray-100">
+                            {user.first_name} {user.last_name}{' '}
+                            <span className={`ml-2 text-[10px] px-2 py-0.5 rounded-full font-sans font-bold uppercase ${
+                              user.role === 'admin' 
+                                ? 'bg-primary/20 text-primary border border-primary/30' 
+                                : user.role === 'professional' 
+                                  ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-900/30'
+                                  : 'bg-gray-800 text-gray-400 border border-gray-700'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{user.email}</p>
+                        </div>
+                        <div>
+                          {user.id !== currentUser.id ? (
+                            <button 
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="px-3 py-1.5 text-[10px] bg-red-950/20 hover:bg-red-900/40 text-red-400 hover:text-red-200 border border-red-900/30 rounded-md cursor-pointer transition-colors"
+                            >
+                              Excluir
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-gray-600 italic">Você (Admin)</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* FORMULÁRIO DE CADASTRO DE PROFISSIONAL */
+              <form onSubmit={handleCreateProfessionalSubmit} className="space-y-4 animate-fadeIn">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 block mb-1.5">Nome</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Nome do profissional"
+                      value={newProfFirstName}
+                      onChange={(e) => setNewProfFirstName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#121214] border border-dark-border focus:border-primary/50 text-sm outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-300 block mb-1.5">Sobrenome</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Sobrenome"
+                      value={newProfLastName}
+                      onChange={(e) => setNewProfLastName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#121214] border border-dark-border focus:border-primary/50 text-sm outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-300 block mb-1.5">E-mail</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="email@exemplo.com"
+                      value={newProfEmail}
+                      onChange={(e) => setNewProfEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#121214] border border-dark-border focus:border-primary/50 text-sm outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-300 block mb-1.5">Senha Provisória</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input 
+                      type="password" 
+                      required
+                      placeholder="Digite uma senha forte"
+                      value={newProfPassword}
+                      onChange={(e) => setNewProfPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#121214] border border-dark-border focus:border-primary/50 text-sm outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-black font-bold text-sm transition-colors cursor-pointer mt-4 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? 'Cadastrando...' : 'Cadastrar Profissional'}
+                  {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
