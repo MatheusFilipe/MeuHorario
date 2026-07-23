@@ -7,7 +7,7 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.pool import StaticPool
+from testcontainers.postgres import PostgresContainer
 
 from meuhorario.app import app
 from meuhorario.database import get_session
@@ -45,13 +45,14 @@ def client(session):
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(scope='session')
+def engine():
+    with PostgresContainer('postgres:latest', driver='psycopg') as postgres:
+        yield create_async_engine(postgres.get_connection_url())
+
+
 @pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine(
-        'sqlite+aiosqlite:///:memory:',
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool,
-    )
+async def session(engine):
     async with engine.begin() as conn:
         await conn.run_sync(table_registry.metadata.create_all)
 
